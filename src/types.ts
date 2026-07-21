@@ -5,6 +5,7 @@
 
 export interface Agent {
   id: string;
+  tenantId?: string;
   role: string;
   customRole?: string;
   tone: string;
@@ -13,7 +14,16 @@ export interface Agent {
   systemPrompt: string;
   created: string;
   invokeCount: number;
-  fee?: number;
+  googleDriveFolderId?: string;
+  vertexDataStoreId?: string;
+  secretManagerPath?: string;
+  status?: string;
+}
+
+export interface DriveFolder {
+  id: string;
+  name: string;
+  parents?: string[];
 }
 
 export interface Message {
@@ -32,7 +42,6 @@ export interface PromptOptions {
   customRole?: string;
   tone: 'professional' | 'casual' | 'academic' | 'cyberpunk';
   securityLevel: 'strict' | 'balanced' | 'permissive';
-  fee?: number;
 }
 
 export interface Settlement {

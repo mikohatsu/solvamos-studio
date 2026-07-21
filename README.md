@@ -1,12 +1,17 @@
-# SolVamos Studio 🚀
+# SolVamos Studio
 
-**SolVamos Studio**는 AI 에이전트 간(Agent-to-Agent, A2A) 거래 및 호출을 위한 초정밀 노코드 AI 에이전트 컴파일러이자 온체인 사용량 기반 배포 플랫폼입니다. 
+**SolVamos Studio**는 AI 에이전트 간(Agent-to-Agent, A2A) 거래 및 호출을 위한 초정밀 노코드 AI 에이전트 컴파일러이자 온체인 사용량 기반 배포 플랫폼입니다.
 
 기존의 단순 챗봇 형태를 넘어, 다른 AI 에이전트나 시스템이 직접 호출하여 사용할 수 있는 전문 비즈니스 API 에이전트를 클릭 몇 번으로 즉시 빌드 및 배포할 수 있습니다. 특히 **pay.sh 프로토콜**을 적용하여 Solana Devnet 기반의 온체인 결제 검증(Paywall Block)을 거친 에이전트 호출 및 사용량 기반 과금 생태계를 완벽하게 제공합니다.
 
+고객 **Google Workspace Drive** 문서를 Sovereign RAG로 연결하며, 고객은 GCP를 몰라도 됩니다. SolVamos Org가 고객 전용 GCP 프로젝트를 대행 운영합니다.
+
+관련 문서: [`docs/concept.md`](../docs/concept.md) · [`docs/plan.md`](../docs/plan.md) · [`docs/progress.md`](../docs/progress.md) · [`docs/GCP_SETUP.md`](../docs/GCP_SETUP.md)  
+배포: [`solvamos-cloudrun`](../solvamos-cloudrun) · IaC: [`infra/terraform`](../infra/terraform)
+
 ---
 
-## ✨ 핵심 기능
+## 핵심 기능
 
 ### 1. 에이전트 특화 분야 (역할 군) 지정 및 커스텀 빌드
 다른 AI 에이전트들이 도메인 지식이나 특정 API 해결을 위해 유료로 구독할 수 있는 전문 분야를 설정할 수 있습니다.
@@ -25,17 +30,19 @@
 
 ---
 
-## 🛠️ 기술 스택
+## 기술 스택
 
 - **Frontend**: React 18, Vite, Tailwind CSS, Motion (애니메이션 효과)
 - **Backend**: Express, Node.js (TypeScript)
-- **AI**: Gemini SDK (`@google/genai` 패키지 사용)
+- **AI**: Gemini SDK (`@google/genai` 패키지 사용), Vertex AI Search (Discovery Engine)
 - **Blockchain**: Solana Devnet (pay.sh 프로토콜 API 명세 시뮬레이션)
 - **Storage & State**: 로컬 및 메모리 저장소, JSON DB 구조 동기화
+- **Cloud**: GCP Secret Manager, Cloud KMS, Cloud Run (`solvamos-cloudrun` 배포)
+- **Google APIs**: OAuth 2.0, Google Drive API (`drive.readonly`)
 
 ---
 
-## 📦 설치 및 시작 가이드
+## 설치 및 시작 가이드
 
 ### 필수 요구사항
 - Node.js 18 이상
@@ -53,6 +60,14 @@ npm install
 ```env
 # Gemini API Key (서버측 비공개 키)
 GEMINI_API_KEY=your_gemini_api_key_here
+
+# (선택) Google OAuth — Drive 연동
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+OAUTH_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
+
+# (선택) GCP
+GOOGLE_CLOUD_PROJECT=
 ```
 
 ### 3. 개발 서버 실행
@@ -71,16 +86,23 @@ npm run build
 npm start
 ```
 
+### 5. Cloud Run 배포
+```powershell
+cd ../solvamos-cloudrun
+.\scripts\deploy.ps1 -ProjectId "YOUR_PROJECT" -Tier "starter"
+```
+GCP 콘솔·시크릿·Vertex Data Store 설정은 [`docs/GCP_SETUP.md`](../docs/GCP_SETUP.md)를 참고하세요.
+
 ---
 
-## 🔍 아키텍처 흐름도
+## 아키텍처 흐름도
 
 ```
 [사용자 UI (SolVamos Studio)]
         │ (1) 에이전트 역할/보안/어조 설정 (예: 기술 지원)
         ▼
 [백엔드 서버 (server.ts)] ──▶ [Gemini API] (프롬프트 동적 컴파일 및 컨텍스트 결합)
-        │ 
+        │
         ├─▶ [GCP KMS 시뮬레이션] (에이전트별 Solana 전용 Private Key 암호화 보관)
         │
         ▼
@@ -90,7 +112,13 @@ npm start
 [On-Chain Devnet 결제 검증] ──▶ 성공 시 에이전트 답변(Vertex AI RAG 연동) 반환
 ```
 
+런타임 분리 (확정):
+- **Cloud Run** = x402 결제 대문 (HTTP 402)
+- **Vertex AI Search + Gemini** = RAG 뇌
+- Drive 원본 = 고객 Google Workspace (플랫폼 Drive 미사용)
+
 ---
 
-## 📜 라이선스
+## 라이선스
+
 This project is licensed under the MIT License.

@@ -1,12 +1,88 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
+/* Stitch DESIGN.md + stitch HTML tokens */
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-background: #081425;
+  --color-surface: #081425;
+  --color-surface-dim: #081425;
+  --color-surface-bright: #2f3a4c;
+  --color-surface-container-lowest: #040e1f;
+  --color-surface-container-low: #111c2d;
+  --color-surface-container: #152031;
+  --color-surface-container-high: #1f2a3c;
+  --color-surface-container-highest: #2a3548;
+  --color-surface-variant: #2a3548;
+  --color-on-surface: #d8e3fb;
+  --color-on-surface-variant: #c2c6d5;
+  --color-on-background: #d8e3fb;
+  --color-outline: #8c909f;
+  --color-outline-variant: #424753;
+  --color-primary: #adc6ff;
+  --color-on-primary: #002e69;
+  --color-primary-container: #4d8efe;
+  --color-secondary: #a0ffc3;
+  --color-secondary-container: #00ec91;
+  --color-on-secondary: #00391f;
+  --color-error: #ffb4ab;
+  --color-google-blue: #4285f4;
+  --color-solana-green: #14f195;
+
+  --spacing-gutter: 24px;
+  --spacing-xxl: 4rem;
+  --text-display-lg: 48px;
+  --text-headline-lg: 32px;
+  --text-headline-md: 24px;
+  --text-body-lg: 18px;
+  --text-body-md: 16px;
+  --text-label-md: 14px;
+  --text-label-sm: 12px;
 }
 
-/* Custom Scrollbar Styles for beautiful technical data tables */
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: #081425;
+  color: #d8e3fb;
+  -webkit-font-smoothing: antialiased;
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-panel:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.btn-primary {
+  background: #4285f4;
+  color: #fff;
+  transition: box-shadow 0.2s, opacity 0.2s;
+}
+
+.btn-primary:hover {
+  box-shadow: 0 0 20px rgba(66, 133, 244, 0.35);
+  opacity: 0.95;
+}
+
+.input-glow:focus {
+  border-color: #4285f4;
+  box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.2);
+}
+
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;
@@ -24,4 +100,3 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(20, 241, 149, 0.4);
 }
-

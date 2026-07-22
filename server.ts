@@ -14,7 +14,7 @@ import { compileSystemPrompt } from './server/prompt.js';
 import { savePrivateKeyToGCP } from './server/vault.js';
 import { verifyPayment } from './server/payment.js';
 import { ensureDriveDataStore, generateGroundedAnswer } from './server/rag.js';
-import { registerDriveAuthRoutes } from './server/drive-oauth.js';
+import { registerDriveAuthRoutes, isDriveAuthAvailable, isOAuthClientConfigured } from './server/drive-oauth.js';
 import { loadTenants, listTenants, getTenant, upsertTenant } from './server/tenants.js';
 import { provisionCustomerProject, plannedProjectId } from './server/provision.js';
 import { config, assertProductionSafety, networkLabel } from './server/config.js';
@@ -84,7 +84,9 @@ app.get('/api/status', (req, res) => {
     tenantId: config.tenantId || null,
     tier: config.tier,
     vertexDataStore: config.vertexDataStoreId || null,
-    oauthConfigured: !!(config.googleClientId && config.googleClientSecret),
+    oauthConfigured: isOAuthClientConfigured(),
+    driveAuthAvailable: isDriveAuthAvailable(),
+    driveAuthMode: isOAuthClientConfigured() ? 'oauth' : 'adc',
     allowLocalVaultFallback: config.allowLocalVaultFallback,
     allowPaymentBypass: config.allowPaymentBypass,
     paymentNetwork: config.paymentNetwork,

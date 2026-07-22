@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="ko"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SolVamos Studio - Login</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-variant": "#2a3548",
+                        "on-secondary": "#00391f",
+                        "inverse-primary": "#005ac1",
+                        "inverse-on-surface": "#263143",
+                        "on-surface-variant": "#c2c6d5",
+                        "primary-container": "#4d8efe",
+                        "surface": "#081425",
+                        "surface-container": "#152031",
+                        "on-tertiary": "#283044",
+                        "surface-container-low": "#111c2d",
+                        "primary-fixed": "#d8e2ff",
+                        "secondary-container": "#00ec91",
+                        "background": "#081425",
+                        "secondary": "#a0ffc3",
+                        "tertiary-fixed": "#dae2fd",
+                        "tertiary-fixed-dim": "#bec6e0",
+                        "outline-variant": "#424753",
+                        "on-secondary-fixed-variant": "#00522f",
+                        "on-tertiary-container": "#22293d",
+                        "on-primary-container": "#00285c",
+                        "primary": "#adc6ff",
+                        "surface-bright": "#2f3a4c",
+                        "surface-dim": "#081425",
+                        "on-error": "#690005",
+                        "error-container": "#93000a",
+                        "error": "#ffb4ab",
+                        "primary-fixed-dim": "#adc6ff",
+                        "inverse-surface": "#d8e3fb",
+                        "on-secondary-container": "#00653b",
+                        "outline": "#8c909f",
+                        "secondary-fixed": "#56ffa8",
+                        "on-surface": "#d8e3fb",
+                        "on-primary-fixed": "#001a41",
+                        "tertiary": "#bec6e0",
+                        "on-background": "#d8e3fb",
+                        "on-tertiary-fixed": "#131b2e",
+                        "on-primary-fixed-variant": "#004494",
+                        "surface-container-lowest": "#040e1f",
+                        "on-primary": "#002e69",
+                        "secondary-fixed-dim": "#00e38b",
+                        "on-tertiary-fixed-variant": "#3f465c",
+                        "tertiary-container": "#8990a8",
+                        "surface-tint": "#adc6ff",
+                        "on-secondary-fixed": "#002110",
+                        "on-error-container": "#ffdad6",
+                        "surface-container-high": "#1f2a3c",
+                        "surface-container-highest": "#2a3548"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "lg": "1.5rem",
+                        "xl": "2rem",
+                        "gutter": "24px",
+                        "margin-mobile": "16px",
+                        "base": "4px",
+                        "xs": "0.25rem",
+                        "xxl": "4rem",
+                        "container-max": "1440px",
+                        "md": "1rem",
+                        "sm": "0.5rem"
+                    },
+                    "fontFamily": {
+                        "label-md": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "display-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "label-md": ["14px", { "lineHeight": "1.2", "letterSpacing": "0.01em", "fontWeight": "500" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "label-sm": ["12px", { "lineHeight": "1.2", "fontWeight": "600" }],
+                        "headline-md": ["24px", { "lineHeight": "1.4", "fontWeight": "600" }],
+                        "display-lg": ["48px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.4);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .bg-gradient-glow {
+            background: radial-gradient(circle at 50% 0%, rgba(66, 133, 244, 0.15) 0%, rgba(20, 241, 149, 0.05) 50%, transparent 100%);
+        }
+        .google-btn-hover:hover {
+            box-shadow: 0 0 15px rgba(66, 133, 244, 0.2);
+            border-color: rgba(66, 133, 244, 0.5);
+            background: rgba(255, 255, 255, 0.05);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex items-center justify-center font-body-md bg-gradient-glow relative overflow-hidden">
+<!-- Abstract Background Elements for Depth -->
+<div class="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-primary/5 blur-[120px] pointer-events-none"></div>
+<div class="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-secondary/5 blur-[120px] pointer-events-none"></div>
+<!-- Login Container -->
+<div class="w-full max-w-md px-margin-mobile md:px-0 relative z-10">
+<!-- Glassmorphism Card -->
+<div class="glass-panel rounded-xl p-xl shadow-2xl flex flex-col items-center text-center">
+<!-- Logo -->
+<div class="mb-lg w-32 h-32 relative flex items-center justify-center">
+<img alt="SolVamos Studio Logo" class="object-contain w-full h-full drop-shadow-[0_0_15px_rgba(66,133,244,0.3)]" src="https://lh3.googleusercontent.com/aida/AP1WRLukrnf_dwbP3CWVbwNC23R4WxUIcDq9HI5ahZPdg5sfJiJQ5TLMBtZWlLz2MmEQ1N0XE73iLux4x7MkWAYvIgcbS7qM3QWGzVBwAbmoKZ3X3fEVgq5BYFPtOy4Ab0AbhUzCNQWqxSYtC8hPo3f9fzugJmMu-FjtEivQWUXs0PU_4eVx3NNMnrkLn9ex638vWh52Ymx7twTDSyofE7NeyaQmxRIcQ0VF4Z2h_be16TEmLzrHpkmHTpNG55y-"/>
+</div>
+<!-- Headers -->
+<h1 class="font-headline-lg-mobile md:font-headline-lg text-on-surface mb-sm tracking-tight">
+                솔바모스 스튜디오에<br/>오신 것을 환영합니다
+            </h1>
+<p class="font-body-md text-on-surface-variant mb-xl">
+                기업용 No-Code AI 에이전트 빌더
+            </p>
+<!-- Google SSO Button -->
+<button class="w-full flex items-center justify-center gap-sm py-3 px-lg rounded-full border border-outline-variant/30 bg-surface-container-low text-on-surface transition-all duration-300 google-btn-hover group">
+<svg class="w-5 h-5" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"></path>
+<path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"></path>
+<path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"></path>
+<path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"></path>
+</svg>
+<span class="font-label-md text-on-surface group-hover:text-primary transition-colors">Google 계정으로 시작하기</span>
+</button>
+<!-- Divider -->
+<div class="w-full flex items-center gap-md my-lg opacity-30">
+<div class="flex-1 h-px bg-outline-variant"></div>
+<div class="flex-1 h-px bg-outline-variant"></div>
+</div>
+<!-- Legal -->
+<p class="font-label-sm text-on-surface-variant/70 text-center max-w-[80%] leading-relaxed">
+                로그인함으로써 서비스 약관 및 개인정보 처리방침에 동의하게 됩니다.
+            </p>
+</div>
+<!-- Footer Footer -->
+<div class="mt-lg text-center flex flex-col items-center justify-center gap-xs opacity-60 hover:opacity-100 transition-opacity">
+<p class="font-label-sm text-on-surface-variant tracking-widest uppercase">Powered by</p>
+<div class="flex items-center gap-sm font-label-md text-on-surface">
+<span class="text-[#4285F4] font-semibold">Google Cloud</span>
+<span class="text-outline-variant">×</span>
+<span class="text-[#14F195] font-semibold">Solana</span>
+</div>
+</div>
+</div>
+</body></html>

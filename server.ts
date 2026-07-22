@@ -5,8 +5,6 @@
 
 import express from 'express';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import { createServer as createViteServer } from 'vite';
 import { Keypair } from '@solana/web3.js';
 import dotenv from 'dotenv';
 
@@ -38,9 +36,6 @@ import { orchestrateA2ATurn } from './server/a2a.js';
 
 dotenv.config();
 assertProductionSafety();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
@@ -654,6 +649,7 @@ app.post('/api/agents/:id/invoke', async (req, res) => {
 
 async function startServer() {
   if (config.nodeEnv !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',

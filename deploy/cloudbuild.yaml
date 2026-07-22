@@ -1,0 +1,49 @@
+# Cloud Build → Artifact Registry → optional Cloud Run deploy
+substitutions:
+  _REGION: asia-northeast3
+  _REPO: solvamos
+  _SERVICE: solvamos-paywall
+  _PROJECT: solvamos-platform
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/studio:$SHORT_SHA
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/studio:latest
+      - .
+    dir: solvamos-studio
+
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/studio:$SHORT_SHA
+
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/studio:latest
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/studio:$SHORT_SHA
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --min-instances=0
+      - --cpu-boost
+      - --set-env-vars=ALLOW_LOCAL_VAULT_FALLBACK=false,ALLOW_PAYMENT_BYPASS=false,CUSTOMER_TIER=starter
+    # Target customer project by overriding $PROJECT_ID in trigger
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/studio:$SHORT_SHA
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/studio:latest
+
+options:
+  logging: CLOUD_LOGGING_ONLY

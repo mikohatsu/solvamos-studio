@@ -1,0 +1,381 @@
+<!DOCTYPE html><html lang="ko" class="dark"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=block" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"><script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script><script id="tailwind-config">try{
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-primary-container": "#00285c",
+                        "secondary-fixed": "#56ffa8",
+                        "secondary-container": "#00ec91",
+                        "on-error-container": "#ffdad6",
+                        "surface-variant": "#2a3548",
+                        "error-container": "#93000a",
+                        "surface-container": "#152031",
+                        "primary": "#adc6ff",
+                        "surface-tint": "#adc6ff",
+                        "on-primary-fixed": "#001a41",
+                        "on-secondary-fixed-variant": "#00522f",
+                        "primary-fixed-dim": "#adc6ff",
+                        "error": "#ffb4ab",
+                        "tertiary": "#bec6e0",
+                        "on-surface-variant": "#c2c6d5",
+                        "tertiary-container": "#8990a8",
+                        "tertiary-fixed-dim": "#bec6e0",
+                        "on-tertiary-container": "#22293d",
+                        "surface": "#081425",
+                        "inverse-on-surface": "#263143",
+                        "tertiary-fixed": "#dae2fd",
+                        "on-secondary-fixed": "#002110",
+                        "background": "#081425",
+                        "on-secondary-container": "#00653b",
+                        "on-secondary": "#00391f",
+                        "inverse-surface": "#d8e3fb",
+                        "on-surface": "#d8e3fb",
+                        "surface-dim": "#081425",
+                        "outline": "#8c909f",
+                        "on-tertiary": "#283044",
+                        "on-tertiary-fixed": "#131b2e",
+                        "on-background": "#d8e3fb",
+                        "on-primary-fixed-variant": "#004494",
+                        "secondary-fixed-dim": "#00e38b",
+                        "surface-container-low": "#111c2d",
+                        "surface-container-high": "#1f2a3c",
+                        "inverse-primary": "#005ac1",
+                        "on-error": "#690005",
+                        "secondary": "#a0ffc3",
+                        "outline-variant": "#424753",
+                        "on-primary": "#002e69",
+                        "surface-container-highest": "#2a3548",
+                        "surface-container-lowest": "#040e1f",
+                        "primary-fixed": "#d8e2ff",
+                        "surface-bright": "#2f3a4c",
+                        "primary-container": "#4d8efe",
+                        "on-tertiary-fixed-variant": "#3f465c",
+                        
+                        "google-blue": "#4285F4",
+                        "solana-green": "#14F195",
+                        "glass-bg": "rgba(255, 255, 255, 0.05)",
+                        "glass-border": "rgba(255, 255, 255, 0.1)",
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "gutter": "24px",
+                        "md": "1rem",
+                        "xs": "0.25rem",
+                        "container-max": "1440px",
+                        "lg": "1.5rem",
+                        "margin-mobile": "16px",
+                        "sm": "0.5rem",
+                        "xl": "2rem",
+                        "xxl": "4rem",
+                        "base": "4px"
+                    },
+                    "fontFamily": {
+                        "headline-lg-mobile": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "label-md": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg-mobile": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "label-md": ["14px", { "lineHeight": "1.2", "letterSpacing": "0.01em", "fontWeight": "500" }],
+                        "display-lg": ["48px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "label-sm": ["12px", { "lineHeight": "1.2", "fontWeight": "600" }],
+                        "headline-md": ["24px", { "lineHeight": "1.4", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.3", "fontWeight": "600" }]
+                    }
+                },
+            },
+        }
+    }catch(_e){}</script><meta charset="utf-8"></head><body class="bg-background text-on-background font-body-md min-h-screen flex overflow-x-hidden">
+<!-- SideNavBar (JSON Component) -->
+<nav class="fixed left-0 top-0 h-full w-[280px] bg-surface-container-low border-r border-outline-variant/10 shadow-none flex flex-col h-screen py-xl z-50">
+<!-- Brand / Header -->
+<div class="px-lg mb-xl flex flex-col gap-sm">
+
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-on-surface">SolVamos Studio</h1>
+<p class="font-label-md text-label-md text-on-surface-variant">Powered by Google Cloud x Solana</p>
+</div>
+</div>
+<!-- Main Navigation Tabs -->
+<div class="flex flex-col gap-xs flex-grow">
+<!-- Inactive Tab -->
+<a class="flex items-center gap-md px-lg py-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest/50 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">precision_manufacturing</span>
+<span class="font-label-md text-label-md">에이전트 스튜디오</span>
+</a>
+<!-- Active Tab -->
+<a class="flex items-center gap-md px-lg py-md bg-secondary-container/10 text-secondary border-r-2 border-secondary scale-[0.98] transition-transform" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+<span class="font-label-md text-label-md">내 에이전트 목록</span>
+</a>
+<!-- Inactive Tab -->
+<a class="flex items-center gap-md px-lg py-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest/50 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">account_balance_wallet</span>
+<span class="font-label-md text-label-md">온체인 정산 내역</span>
+</a>
+</div>
+<!-- Footer / Utility-->
+<div class="flex flex-col gap-xs mt-auto pt-lg border-t border-outline-variant/10 px-sm">
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest/50 transition-all duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">settings</span>
+<span class="font-label-md text-label-md">설정</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest/50 transition-all duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">support_agent</span>
+<span class="font-label-md text-label-md">고객 지원</span>
+</a>
+<!-- CTA -->
+<button class="mt-lg mx-md py-sm rounded-lg btn-primary font-label-md text-label-md flex items-center justify-center gap-sm">
+<span class="material-symbols-outlined text-sm">add</span>
+                새 에이전트 생성
+            </button>
+</div>
+</nav>
+<!-- Main Content Wrapper -->
+<div class="flex-grow flex flex-col ml-[280px]">
+<!-- TopAppBar (JSON Component) -->
+<header class="flex justify-between items-center h-16 pl-lg pr-lg w-full bg-surface/80 backdrop-blur-xl border-b border-outline-variant/10 sticky top-0 z-40">
+<!-- Search (Left) -->
+<div class="flex-grow max-w-md">
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-3 text-on-surface-variant">search</span>
+<input class="w-full bg-surface-container-high border border-outline-variant/50 rounded-full py-1.5 pl-10 pr-4 font-label-md text-label-md text-on-surface focus:outline-none focus:border-google-blue focus:ring-1 focus:ring-google-blue transition-colors placeholder:text-on-surface-variant" placeholder="Search..." type="text">
+</div>
+</div>
+<!-- Actions (Right) -->
+<div class="flex items-center gap-md ml-auto">
+<!-- Icon Actions -->
+<button class="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest/30 rounded-full transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest/30 rounded-full transition-colors">
+<span class="material-symbols-outlined">help_outline</span>
+</button>
+<!-- Secondary Action -->
+<div class="h-6 w-px bg-outline-variant/30 mx-2"></div>
+<button class="font-label-md text-label-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest/30 px-3 py-1.5 rounded-lg transition-colors">
+                    Workspace
+                </button>
+<!-- Primary Action -->
+<button class="btn-primary px-4 py-2 rounded-full font-label-md text-label-md flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">account_balance_wallet</span>
+                    Connect Wallet
+                </button>
+<!-- Avatar -->
+<div class="w-8 h-8 rounded-full bg-surface-container-high overflow-hidden border border-outline-variant/20 ml-2">
+<img class="w-full h-full object-cover" data-alt="A highly detailed 3D render of a futuristic, abstract user avatar. It features a sleek, glowing holographic bust made of intersecting light-blue and white geometric facets, set against a pitch-black background. High contrast, cinematic lighting, sharp details, polished glass texture. The avatar exudes a sense of premium, secure, anonymous professional identity in a high-tech corporate SaaS environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBvKGvtlsq_sirFig3xpxbPGPUVy6WE0I2iekFqG7nKcLmmwAyqaLkzLWy9AlKx-z3wYLozWTH8f_RbvkLRoPurdk_GuYH7iiqo3MkCpxn0kUo9XWG3WoHsD4gGEWIaWTQZ53PBRO441RW3U1VyZnihA8QDWi2z0ybyf_iUcOHPNtKttWcG0H1H2JSfLk6Y66aUEj-mkn9S__wUeRmFq9n7xhQdd2PQF1i95sF_3TNdiivfcau4Ev3NeQ">
+</div>
+</div>
+</header>
+<!-- Canvas / Page Content -->
+<main class="flex-grow p-gutter flex flex-col gap-gutter">
+<!-- Page Header -->
+<div class="flex justify-between items-end">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface mb-2">내 에이전트 목록</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">관리 중인 AI 에이전트들의 가동 상태와 실시간 성능 지표를 확인하세요.</p>
+</div>
+</div>
+<!-- Summary Stats -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-gutter mb-md">
+<div class="glass-panel rounded-xl p-lg flex items-center gap-lg border-l-4 border-l-solana-green">
+<div class="w-12 h-12 rounded-full bg-solana-green/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-solana-green text-3xl">smart_toy</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface-variant mb-1">Total Active Agents</p>
+<p class="font-headline-md text-headline-md text-on-surface">2</p>
+</div>
+</div>
+<div class="glass-panel rounded-xl p-lg flex items-center gap-lg border-l-4 border-l-google-blue">
+<div class="w-12 h-12 rounded-full bg-google-blue/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-google-blue text-3xl">payments</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface-variant mb-1">Total Revenue (24h)</p>
+<p class="font-headline-md text-headline-md text-google-blue flex items-baseline gap-xs">
+                            $20.90 <span class="font-label-sm text-label-sm text-on-surface-variant">USDC</span>
+</p>
+</div>
+</div>
+</div>
+<!-- Filters -->
+<div class="flex justify-between items-center bg-surface-container p-sm rounded-lg border border-outline-variant/10">
+<div class="flex gap-sm">
+<button class="px-4 py-1.5 rounded-md font-label-md text-label-md bg-google-blue/20 text-google-blue border border-google-blue/30">All</button>
+<button class="px-4 py-1.5 rounded-md font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high transition-colors">Active</button>
+<button class="px-4 py-1.5 rounded-md font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high transition-colors">Inactive</button>
+</div>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">filter_list</span>
+<select class="input-field bg-surface-container-high border border-outline-variant/30 rounded-md py-1.5 pl-9 pr-8 font-label-md text-label-md text-on-surface appearance-none">
+<option>Sort by: Revenue</option>
+<option>Sort by: API Calls</option>
+<option>Sort by: Name</option>
+</select>
+</div>
+</div>
+<!-- Agent List Cards (Bento/Card Style) -->
+<div class="flex flex-col gap-md">
+<!-- Row 1 -->
+<div class="glass-panel rounded-xl p-lg agent-card transition-all duration-200">
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-md">
+<!-- Info -->
+<div class="flex items-center gap-md flex-grow">
+<div class="w-14 h-14 rounded-lg bg-surface-container-high flex items-center justify-center border border-outline-variant/20 flex-shrink-0">
+<span class="material-symbols-outlined text-2xl text-on-surface">psychology</span>
+</div>
+<div>
+<div class="flex items-center gap-sm mb-1">
+<h3 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">사내 복지 안내 AI 비서</h3>
+<div class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-solana-green/10 border border-solana-green/20">
+<div class="w-2 h-2 rounded-full bg-solana-green shadow-[0_0_8px_rgba(20,241,149,0.8)]"></div>
+<span class="font-label-sm text-label-sm text-solana-green">Active</span>
+</div>
+</div>
+<div class="flex gap-4 text-on-surface-variant font-label-md text-label-md">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">work</span> HR/Welfare</span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">record_voice_over</span> Polite</span>
+</div>
+</div>
+</div>
+<!-- Metrics & Actions -->
+<div class="flex items-center gap-xl w-full md:w-auto">
+<div class="text-right">
+<p class="font-label-sm text-label-sm text-on-surface-variant mb-1">API Calls</p>
+<p class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">1,240</p>
+</div>
+<div class="text-right">
+<p class="font-label-sm text-label-sm text-on-surface-variant mb-1">Revenue</p>
+<p class="font-headline-lg-mobile text-headline-lg-mobile text-solana-green">$12.40</p>
+</div>
+<div class="h-10 w-px bg-outline-variant/30 hidden md:block"></div>
+<div class="flex gap-sm ml-auto md:ml-0">
+<button class="p-2 rounded-md border border-outline-variant/30 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-colors" title="Stats">
+<span class="material-symbols-outlined text-[20px]">bar_chart</span>
+</button>
+<button class="p-2 rounded-md border border-outline-variant/30 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-colors" title="Edit">
+<span class="material-symbols-outlined text-[20px]">edit</span>
+</button>
+<button class="px-3 py-1.5 rounded-md btn-secondary font-label-md text-label-md flex items-center gap-1">
+<span class="material-symbols-outlined text-[18px]">pause</span>
+                                    Pause
+                                </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Row 2 -->
+<div class="glass-panel rounded-xl p-lg agent-card transition-all duration-200">
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-md">
+<!-- Info -->
+<div class="flex items-center gap-md flex-grow">
+<div class="w-14 h-14 rounded-lg bg-surface-container-high flex items-center justify-center border border-outline-variant/20 flex-shrink-0">
+<span class="material-symbols-outlined text-2xl text-on-surface">terminal</span>
+</div>
+<div>
+<div class="flex items-center gap-sm mb-1">
+<h3 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">기술 문서 Q&amp;A 봇</h3>
+<div class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-solana-green/10 border border-solana-green/20">
+<div class="w-2 h-2 rounded-full bg-solana-green shadow-[0_0_8px_rgba(20,241,149,0.8)]"></div>
+<span class="font-label-sm text-label-sm text-solana-green">Active</span>
+</div>
+</div>
+<div class="flex gap-4 text-on-surface-variant font-label-md text-label-md">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">code</span> Tech Support</span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">record_voice_over</span> Professional</span>
+</div>
+</div>
+</div>
+<!-- Metrics & Actions -->
+<div class="flex items-center gap-xl w-full md:w-auto">
+<div class="text-right">
+<p class="font-label-sm text-label-sm text-on-surface-variant mb-1">API Calls</p>
+<p class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">850</p>
+</div>
+<div class="text-right">
+<p class="font-label-sm text-label-sm text-on-surface-variant mb-1">Revenue</p>
+<p class="font-headline-lg-mobile text-headline-lg-mobile text-solana-green">$8.50</p>
+</div>
+<div class="h-10 w-px bg-outline-variant/30 hidden md:block"></div>
+<div class="flex gap-sm ml-auto md:ml-0">
+<button class="p-2 rounded-md border border-outline-variant/30 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-colors" title="Stats">
+<span class="material-symbols-outlined text-[20px]">bar_chart</span>
+</button>
+<button class="p-2 rounded-md border border-outline-variant/30 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-colors" title="Edit">
+<span class="material-symbols-outlined text-[20px]">edit</span>
+</button>
+<button class="px-3 py-1.5 rounded-md btn-secondary font-label-md text-label-md flex items-center gap-1">
+<span class="material-symbols-outlined text-[18px]">pause</span>
+                                    Pause
+                                </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Row 3 (Inactive) -->
+<div class="glass-panel rounded-xl p-lg agent-card transition-all duration-200 opacity-75 grayscale-[30%] hover:grayscale-0 hover:opacity-100">
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-md">
+<!-- Info -->
+<div class="flex items-center gap-md flex-grow">
+<div class="w-14 h-14 rounded-lg bg-surface-container-high flex items-center justify-center border border-outline-variant/20 flex-shrink-0">
+<span class="material-symbols-outlined text-2xl text-on-surface-variant">support_agent</span>
+</div>
+<div>
+<div class="flex items-center gap-sm mb-1">
+<h3 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface-variant">CS 자동 응답 에이전트</h3>
+<div class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-outline-variant/20 border border-outline-variant/30">
+<div class="w-2 h-2 rounded-full bg-outline-variant"></div>
+<span class="font-label-sm text-label-sm text-outline-variant">Inactive</span>
+</div>
+</div>
+<div class="flex gap-4 text-on-surface-variant font-label-md text-label-md">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">headset_mic</span> Customer Service</span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">record_voice_over</span> Clear/Concise</span>
+</div>
+</div>
+</div>
+<!-- Metrics & Actions -->
+<div class="flex items-center gap-xl w-full md:w-auto">
+<div class="text-right">
+<p class="font-label-sm text-label-sm text-on-surface-variant mb-1">API Calls</p>
+<p class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface-variant">0</p>
+</div>
+<div class="text-right">
+<p class="font-label-sm text-label-sm text-on-surface-variant mb-1">Revenue</p>
+<p class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface-variant">$0.00</p>
+</div>
+<div class="h-10 w-px bg-outline-variant/30 hidden md:block"></div>
+<div class="flex gap-sm ml-auto md:ml-0">
+<button class="p-2 rounded-md border border-outline-variant/30 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-colors" title="Stats">
+<span class="material-symbols-outlined text-[20px]">bar_chart</span>
+</button>
+<button class="p-2 rounded-md border border-outline-variant/30 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-colors" title="Edit">
+<span class="material-symbols-outlined text-[20px]">edit</span>
+</button>
+<button class="px-3 py-1.5 rounded-md bg-surface-container hover:bg-surface-container-highest border border-outline-variant text-on-surface font-label-md text-label-md flex items-center gap-1 transition-colors">
+<span class="material-symbols-outlined text-[18px]">play_arrow</span>
+                                    Activate
+                                </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+
+</body></html>

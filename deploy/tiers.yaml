@@ -1,0 +1,25 @@
+# Tier → Cloud Run scaling reference (mirrored in Terraform locals)
+# starter:       min=0, max=20
+# professional:  min=1, max=20
+# enterprise:    min=2, max=100
+
+tiers:
+  starter:
+    min_instances: 0
+    max_instances: 20
+    cpu: "1"
+    memory: 512Mi
+  professional:
+    min_instances: 1
+    max_instances: 20
+    cpu: "1"
+    memory: 1Gi
+  enterprise:
+    min_instances: 2
+    max_instances: 100
+    cpu: "2"
+    memory: 2Gi
+
+monitoring:
+  alert_on_5xx_rate: true
+  budget_usd_default: 500

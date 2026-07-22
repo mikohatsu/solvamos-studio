@@ -6,3 +6,7 @@ coverage/
 *.log
 .env*
 !.env.example
+kms_vault_mock.json
+agents_db.json
+tenants_db.json
+.data/

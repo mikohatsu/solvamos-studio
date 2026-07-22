@@ -1,0 +1,329 @@
+<!DOCTYPE html><html lang="ko" class="dark" style=""><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=block" rel="stylesheet"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin=""><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"><script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script><script id="tailwind-config">try{
+        try{
+            tailwind.config = {
+                darkMode: "class",
+                theme: {
+                    extend: {
+                        "colors": {
+                            "surface-container-lowest": "#040e1f",
+                            "on-primary-container": "#00285c",
+                            "on-tertiary-container": "#22293d",
+                            "tertiary-fixed": "#dae2fd",
+                            "primary-fixed": "#d8e2ff",
+                            "on-tertiary": "#283044",
+                            "surface-tint": "#adc6ff",
+                            "surface-bright": "#2f3a4c",
+                            "surface": "#081425",
+                            "on-error-container": "#ffdad6",
+                            "on-secondary-fixed-variant": "#00522f",
+                            "surface-container-highest": "#2a3548",
+                            "on-secondary": "#00391f",
+                            "primary-container": "#4d8efe",
+                            "surface-container": "#152031",
+                            "tertiary-container": "#8990a8",
+                            "error-container": "#93000a",
+                            "on-background": "#d8e3fb",
+                            "surface-container-low": "#111c2d",
+                            "secondary-fixed-dim": "#00e38b",
+                            "on-tertiary-fixed-variant": "#3f465c",
+                            "inverse-surface": "#d8e3fb",
+                            "on-primary": "#002e69",
+                            "surface-container-high": "#1f2a3c",
+                            "outline-variant": "#424753",
+                            "on-surface-variant": "#c2c6d5",
+                            "surface-variant": "#2a3548",
+                            "surface-dim": "#081425",
+                            "error": "#ffb4ab",
+                            "secondary-container": "#00ec91",
+                            "on-error": "#690005",
+                            "inverse-primary": "#005ac1",
+                            "on-surface": "#d8e3fb",
+                            "primary-fixed-dim": "#adc6ff",
+                            "on-primary-fixed": "#001a41",
+                            "primary": "#adc6ff",
+                            "on-tertiary-fixed": "#131b2e",
+                            "inverse-on-surface": "#263143",
+                            "on-secondary-fixed": "#002110",
+                            "on-primary-fixed-variant": "#004494",
+                            "on-secondary-container": "#00653b",
+                            "secondary": "#a0ffc3",
+                            "tertiary-fixed-dim": "#bec6e0",
+                            "outline": "#8c909f",
+                            "background": "#081425",
+                            "secondary-fixed": "#56ffa8",
+                            "tertiary": "#bec6e0",
+                            "google-blue": "#4285F4",
+                            "solana-green": "#14F195",
+                        },
+                        "borderRadius": {
+                            "DEFAULT": "0.25rem",
+                            "lg": "0.5rem",
+                            "xl": "0.75rem",
+                            "full": "9999px"
+                        },
+                        "spacing": {
+                            "sm": "0.5rem",
+                            "lg": "1.5rem",
+                            "xs": "0.25rem",
+                            "xl": "2rem",
+                            "margin-mobile": "16px",
+                            "xxl": "4rem",
+                            "gutter": "24px",
+                            "container-max": "1440px",
+                            "md": "1rem",
+                            "base": "4px"
+                        },
+                        "fontFamily": {
+                            "headline-lg": ["Inter"],
+                            "body-lg": ["Inter"],
+                            "label-sm": ["Inter"],
+                            "headline-md": ["Inter"],
+                            "headline-lg-mobile": ["Inter"],
+                            "body-md": ["Inter"],
+                            "display-lg": ["Inter"],
+                            "label-md": ["Inter"]
+                        },
+                        "fontSize": {
+                            "headline-lg": ["32px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                            "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                            "label-sm": ["12px", { "lineHeight": "1.2", "fontWeight": "600" }],
+                            "headline-md": ["24px", { "lineHeight": "1.4", "fontWeight": "600" }],
+                            "headline-lg-mobile": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                            "body-md": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                            "display-lg": ["48px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                            "label-md": ["14px", { "lineHeight": "1.2", "letterSpacing": "0.01em", "fontWeight": "500" }]
+                        }
+                    },
+                }
+            }
+        }catch(_e){}
+    }catch(_e){}</script></head><body class="bg-background text-on-surface antialiased min-h-screen flex font-sans overflow-x-hidden">
+
+    <!-- SideNavBar -->
+    <nav class="fixed left-0 top-0 h-full w-[280px] bg-surface-container-low border-r border-outline-variant/10 shadow-none flex flex-col py-xl z-50"><!-- Brand / Header -->
+<div class="px-lg mb-xl flex flex-col gap-sm">
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-on-surface">SolVamos Studio</h1>
+<p class="font-label-md text-label-md text-on-surface-variant">Powered by Google Cloud x Solana</p>
+</div>
+</div>
+<!-- Main Navigation Tabs -->
+<div class="flex flex-col gap-xs flex-grow">
+<!-- Inactive Tab -->
+<a class="flex items-center gap-md px-lg py-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest/50 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">precision_manufacturing</span>
+<span class="font-label-md text-label-md">에이전트 스튜디오</span>
+</a>
+<!-- Active Tab -->
+<a class="flex items-center gap-md px-lg py-md bg-secondary-container/10 text-secondary border-r-2 border-secondary scale-[0.98] transition-transform" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+<span class="font-label-md text-label-md">내 에이전트 목록</span>
+</a>
+<!-- Inactive Tab -->
+<a class="flex items-center gap-md px-lg py-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest/50 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">account_balance_wallet</span>
+<span class="font-label-md text-label-md">온체인 정산 내역</span>
+</a>
+</div>
+<!-- Footer / Utility-->
+<div class="flex flex-col gap-xs mt-auto pt-lg border-t border-outline-variant/10 px-sm">
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest/50 transition-all duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">settings</span>
+<span class="font-label-md text-label-md">설정</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest/50 transition-all duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">support_agent</span>
+<span class="font-label-md text-label-md">고객 지원</span>
+</a>
+<!-- CTA -->
+<button class="mt-lg mx-md py-sm rounded-lg btn-primary font-label-md text-label-md flex items-center justify-center gap-sm">
+<span class="material-symbols-outlined text-sm">add</span>
+                새 에이전트 생성
+            </button>
+</div></nav>
+
+    <!-- Main Content Wrapper -->
+    <div class="flex-grow flex flex-col ml-[280px]">
+        
+        <!-- TopAppBar -->
+        <header class="flex justify-between items-center h-16 pl-lg pr-lg w-full bg-surface/80 backdrop-blur-xl border-b border-outline-variant/10 sticky top-0 z-40"><!-- Search (Left) -->
+<div class="flex-grow max-w-md">
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-3 text-on-surface-variant">search</span>
+<input class="w-full bg-surface-container-high border border-outline-variant/50 rounded-full py-1.5 pl-10 pr-4 font-label-md text-label-md text-on-surface focus:outline-none focus:border-google-blue focus:ring-1 focus:ring-google-blue transition-colors placeholder:text-on-surface-variant" placeholder="Search..." type="text">
+</div>
+</div>
+<!-- Actions (Right) -->
+<div class="flex items-center gap-md ml-auto">
+<!-- Icon Actions -->
+<button class="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest/30 rounded-full transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest/30 rounded-full transition-colors">
+<span class="material-symbols-outlined">help_outline</span>
+</button>
+<!-- Secondary Action -->
+<div class="h-6 w-px bg-outline-variant/30 mx-2"></div>
+<button class="font-label-md text-label-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest/30 px-3 py-1.5 rounded-lg transition-colors">
+                    Workspace
+                </button>
+<!-- Primary Action -->
+<button class="btn-primary px-4 py-2 rounded-full font-label-md text-label-md flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">account_balance_wallet</span>
+                    Connect Wallet
+                </button>
+<!-- Avatar -->
+<div class="w-8 h-8 rounded-full bg-surface-container-high overflow-hidden border border-outline-variant/20 ml-2">
+<img class="w-full h-full object-cover" data-alt="A highly detailed 3D render of a futuristic, abstract user avatar." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBvKGvtlsq_sirFig3xpxbPGPUVy6WE0I2iekFqG7nKcLmmwAyqaLkzLWy9AlKx-z3wYLozWTH8f_RbvkLRoPurdk_GuYH7iiqo3MkCpxn0kUo9XWG3WoHsD4gGEWIaWTQZ53PBRO441RW3U1VyZnihA8QDWi2z0ybyf_iUcOHPNtKttWcG0H1H2JSfLk6Y66aUEj-mkn9S__wUeRmFq9n7xhQdd2PQF1i95sF_3TNdiivfcau4Ev3NeQ">
+</div>
+</div></header>
+
+        <!-- Canvas / Page Content -->
+        <main class="flex-grow p-gutter flex flex-col lg:flex-row gap-gutter">
+            
+            <!-- Left Column: Builder (70%) -->
+            <div class="flex-grow flex flex-col gap-lg lg:w-[65%] xl:w-[70%]">
+                
+                <!-- Header for Builder -->
+                <div class="mb-md">
+                    <h1 class="font-display-lg text-display-lg text-on-surface">에이전트 스튜디오</h1>
+                    <p class="font-body-lg text-body-lg text-on-surface-variant mt-sm">새로운 AI 에이전트를 구성하고 배포하세요.</p>
+                </div>
+
+                <!-- Step 1: Google Drive -->
+                <section class="glass-panel rounded-xl p-lg transition-all duration-300">
+                    <div class="flex items-center gap-sm mb-lg">
+                        <div class="h-8 w-8 rounded-full bg-[#14F195]/20 text-[#14F195] flex items-center justify-center font-bold border border-[#14F195]/30">1</div>
+                        <h2 class="font-headline-md text-headline-md text-on-surface">AI 에이전트 지식 기반 선택</h2>
+                    </div>
+                    
+                    <div class="space-y-sm">
+                        <!-- Selected Folder -->
+                        <div class="flex items-center justify-between p-md rounded-lg bg-[#4285F4]/10 border border-[#4285F4]/30 cursor-pointer">
+                            <div class="flex items-center gap-md">
+                                <span class="material-symbols-outlined text-[#4285F4]" style="font-variation-settings: 'FILL' 1;">folder</span>
+                                <span class="font-body-md text-body-md text-on-surface font-medium">Solana_Mainnet_Protocol_Docs</span>
+                            </div>
+                            <span class="material-symbols-outlined text-[#14F195]">check_circle</span>
+                        </div>
+                        
+                        <!-- Unselected Folder -->
+                        <div class="flex items-center justify-between p-md rounded-lg bg-surface-container-high border border-outline-variant/20 hover:border-outline-variant/50 transition-colors cursor-pointer">
+                            <div class="flex items-center gap-md">
+                                <span class="material-symbols-outlined text-on-surface-variant">folder</span>
+                                <span class="font-body-md text-body-md text-on-surface-variant">Real-time_Onchain_Data_Spec</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="mt-lg flex items-center justify-center gap-sm w-full py-md rounded-lg border border-[#4285F4] text-[#4285F4] hover:bg-[#4285F4]/10 transition-colors font-label-md text-label-md">
+                        <span class="material-symbols-outlined">add</span>
+                        Google Drive 폴더 추가하기
+                    </button>
+                </section>
+
+                <!-- Step 2: Agent Config -->
+                <section class="glass-panel rounded-xl p-lg transition-all duration-300">
+                    <div class="flex items-center gap-sm mb-lg">
+                        <div class="h-8 w-8 rounded-full bg-[#14F195]/20 text-[#14F195] flex items-center justify-center font-bold border border-[#14F195]/30">2</div>
+                        <div class="flex flex-col"><h2 class="font-headline-md text-headline-md text-on-surface">2. 에이전트 역할 및 응답 스타일 설정</h2><p class="font-label-md text-label-md text-on-surface-variant mt-xs">프롬프트 작성 없이 버튼 클릭만으로 에이전트의 성격을 지정하세요.</p></div>
+                    </div>
+
+                    <div class="space-y-lg">
+                        <div>
+                            <label class="block font-label-md text-label-md text-on-surface-variant mb-sm">에이전트 이름</label>
+                            <input type="text" value="사내 복지 안내 AI 비서" class="w-full bg-surface-container-low border border-outline-variant/30 rounded-lg px-md py-sm text-on-surface input-glow focus:outline-none font-body-md text-body-md">
+                        </div>
+
+                        <div class="space-y-lg"><div class="space-y-sm"><label class="block font-label-md text-label-md text-on-surface-variant">[에이전트 주요 역할]</label><div class="flex flex-wrap gap-sm"><button class="px-md py-2 rounded-lg border border-[#4285F4] bg-[#4285F4]/10 text-[#4285F4] font-label-md text-label-md">🏢 사내 HR/복지 안내</button><button class="px-md py-2 rounded-lg border border-outline-variant/30 bg-surface-container-low text-on-surface-variant hover:border-outline-variant/50 transition-colors font-label-md text-label-md">🛍️ 고객지원/CS</button><button class="px-md py-2 rounded-lg border border-outline-variant/30 bg-surface-container-low text-on-surface-variant hover:border-outline-variant/50 transition-colors font-label-md text-label-md">🔧 기술 지원/가이드</button></div></div><div class="space-y-sm"><label class="block font-label-md text-label-md text-on-surface-variant">[답변 톤앤매너]</label><div class="flex flex-wrap gap-sm"><button class="px-md py-2 rounded-lg border border-[#4285F4] bg-[#4285F4]/10 text-[#4285F4] font-label-md text-label-md">😊 친절하고 정중하게</button><button class="px-md py-2 rounded-lg border border-outline-variant/30 bg-surface-container-low text-on-surface-variant hover:border-outline-variant/50 transition-colors font-label-md text-label-md">🎯 명확하고 간결하게</button><button class="px-md py-2 rounded-lg border border-outline-variant/30 bg-surface-container-low text-on-surface-variant hover:border-outline-variant/50 transition-colors font-label-md text-label-md">📊 전문적이고 정량적으로</button></div></div></div>
+
+                        <div class="bg-surface-container p-md rounded-lg border border-outline-variant/10">
+                            <div class="flex justify-between items-center mb-sm">
+                                <label class="font-label-md text-label-md text-on-surface">호출 당 청구 단가</label>
+                                <span class="font-label-md text-label-md text-secondary font-bold">$0.01 USDC / 회</span>
+                            </div>
+                            <input type="range" min="0.01" max="1.00" step="0.01" value="0.01" class="w-full mt-sm">
+                        </div>
+
+                        <div class="flex items-center gap-sm text-on-surface-variant bg-[#1E293B]/50 p-sm rounded-lg border border-outline-variant/10"><span class="material-symbols-outlined text-[16px]">shield</span><span class="font-label-sm text-label-sm">🛡️ 백엔드가 A2A 보안 규격 프롬프트를 자동으로 조립하여 주입합니다.</span></div>
+                    </div>
+                </section>
+
+                <!-- Step 3: CTA -->
+                <section class="mt-md">
+                    <button class="w-full bg-gradient-to-r from-[#4285F4] to-[#14F195] text-surface-container-lowest font-headline-md text-headline-md py-lg rounded-xl flex items-center justify-center gap-md hover:opacity-90 transition-opacity glow-hover">
+                        <span class="material-symbols-outlined text-[28px]">rocket_launch</span>
+                        에이전트 생성 및 pay.sh 카탈로그 게시하기
+                    </button>
+                </section>
+
+            </div>
+
+            <!-- Right Column: Sandbox (30%) -->
+            <div class="flex flex-col gap-lg h-full lg:w-[35%] xl:w-[30%]">
+                
+                <section class="glass-panel rounded-xl flex flex-col h-full border border-outline-variant/20 overflow-hidden relative">
+                    
+                    <!-- Sandbox Header -->
+                    <div class="p-md border-b border-outline-variant/20 bg-surface-container-high/50 flex justify-between items-center">
+                        <div class="flex items-center gap-sm">
+                            <span class="material-symbols-outlined text-primary">science</span>
+                            <h3 class="font-headline-md text-headline-md text-on-surface text-[18px]">에이전트 실시간 테스트</h3>
+                        </div>
+                        <span class="flex h-3 w-3">
+                            <span class="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-secondary opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-3 w-3 bg-secondary"></span>
+                        </span>
+                    </div>
+
+                    <!-- Chat Area -->
+                    <div class="flex-1 p-md flex flex-col gap-md overflow-y-auto min-h-[400px]">
+                        
+                        <!-- User Message -->
+                        <div class="flex justify-end">
+                            <div class="bg-[#4285F4] text-white px-md py-sm rounded-2xl rounded-tr-sm max-w-[85%] font-body-md text-body-md shadow-lg shadow-[#4285F4]/20">현재 SOL/USDC 페어의 주요 유동성 풀 가스비 최적화 경로 분석해줘.</div>
+                        </div>
+
+                        <!-- AI Message -->
+                        <div class="flex justify-start">
+                            <div class="bg-surface-container-high text-on-surface px-md py-sm rounded-2xl rounded-tl-sm max-w-[90%] font-body-md text-body-md border border-outline-variant/20">분석 결과, 현재 Raydium CLMM 경로가 가장 효율적입니다. 가스비는 약 0.000005 SOL이며, 슬리피지는 0.1% 미만으로 예상됩니다. <div class="mt-2 flex items-center gap-1 text-xs text-on-surface-variant bg-surface-container-highest/50 inline-flex px-2 py-1 rounded-md"><span class="material-symbols-outlined text-[14px]">description</span> 출처: Solana_Mainnet_Protocol_Docs</div></div>
+                        </div>
+                    </div>
+
+                    <!-- Input Area (Dummy) -->
+                    <div class="p-md border-t border-outline-variant/20 bg-surface-container/50">
+                        <div class="relative">
+                            <input type="text" placeholder="메시지 입력..." disabled="" class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-full pl-md pr-xl py-sm text-on-surface-variant font-body-md text-body-md cursor-not-allowed">
+                            <button class="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-surface-container-highest flex items-center justify-center text-on-surface-variant">
+                                <span class="material-symbols-outlined text-[18px]">send</span>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Status Card -->
+                <section class="glass-panel rounded-xl p-md border border-outline-variant/20">
+                    <div class="flex flex-col gap-sm">
+                        <div class="flex justify-between items-center">
+                            <span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">연결된 지갑</span>
+                            <div class="flex items-center gap-1 bg-surface-container-highest px-2 py-1 rounded-md text-xs font-mono text-on-surface">
+                                <span class="h-2 w-2 rounded-full bg-[#14F195]"></span>
+                                7Xw9...k2Lp
+                            </div>
+                        </div>
+                        <div class="h-px w-full bg-outline-variant/20"></div>
+                        <div class="flex justify-between items-center">
+                            <span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">상태</span>
+                            <div class="flex items-center gap-2">
+                                &lt;
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+
+
+</body></html>

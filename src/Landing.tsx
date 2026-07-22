@@ -6,11 +6,19 @@ import { Cloud, Wallet, Boxes } from 'lucide-react';
 
 type Props = {
   onContinue: () => void;
+  onDevSkip?: () => void;
   oauthConfigured?: boolean;
   busy?: boolean;
+  error?: string | null;
 };
 
-export default function Landing({ onContinue, oauthConfigured, busy }: Props) {
+export default function Landing({
+  onContinue,
+  onDevSkip,
+  oauthConfigured,
+  busy,
+  error,
+}: Props) {
   return (
     <div className="bg-[#0F172A] text-on-surface min-h-screen flex items-center justify-center font-sans relative overflow-hidden">
       <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-primary/5 blur-[120px] pointer-events-none" />
@@ -64,12 +72,12 @@ export default function Landing({ onContinue, oauthConfigured, busy }: Props) {
               시작하기
             </h2>
             <p className="text-base text-on-surface-variant mb-10">
-              안전하고 빠르게 워크스페이스에 접속하세요.
+              Google 계정으로 로그인하면 Drive 폴더를 연결하고 워크스페이스에 입장합니다.
             </p>
 
             <button
               type="button"
-              disabled={busy}
+              disabled={busy || oauthConfigured === false}
               onClick={onContinue}
               className="w-full flex items-center justify-center gap-4 py-4 px-6 rounded-full border border-outline-variant/40 bg-surface-container text-on-surface transition-all duration-300 hover:border-google-blue/50 hover:bg-surface-container-high group disabled:opacity-50 cursor-pointer"
             >
@@ -79,12 +87,33 @@ export default function Landing({ onContinue, oauthConfigured, busy }: Props) {
               </span>
             </button>
 
-            {!oauthConfigured && (
+            {error && (
+              <p className="mt-4 text-xs text-red-400 leading-relaxed whitespace-pre-wrap">{error}</p>
+            )}
+
+            {oauthConfigured === false && (
               <p className="mt-4 text-xs text-outline leading-relaxed">
-                Google OAuth Client가 아직 없습니다. `.env`에 GOOGLE_CLIENT_ID /
-                SECRET을 넣으면 Drive 로그인이 활성화됩니다.
+                OAuth Client가 `.env`에 없습니다. GCP에서 Web Client를 발급하고
+                `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`을 넣은 뒤 서버를 재시작하세요.
                 <br />
                 안내: docs/DRIVE_OAUTH_SETUP.md
+              </p>
+            )}
+
+            {oauthConfigured === false && onDevSkip && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={onDevSkip}
+                className="mt-6 text-xs text-on-surface-variant underline hover:text-on-surface disabled:opacity-50"
+              >
+                개발 모드로 입장 (로그인 없이)
+              </button>
+            )}
+
+            {oauthConfigured && (
+              <p className="mt-4 text-xs text-solana-green/80 leading-relaxed">
+                Google SSO 준비됨 · Drive.readonly 권한 포함
               </p>
             )}
 

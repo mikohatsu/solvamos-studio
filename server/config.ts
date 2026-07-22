@@ -2,6 +2,9 @@
  * Central runtime configuration for SolVamos Studio (Cloud Run / local).
  */
 
+import dotenv from 'dotenv';
+dotenv.config();
+
 export type CustomerTier = 'starter' | 'professional' | 'enterprise';
 
 /** sandbox = pay.sh local sandbox proofs; localnet = solana-test-validator; devnet = public Devnet */
@@ -37,6 +40,17 @@ function defaultUsdcMint(network: PaymentNetwork): string {
 
 const paymentNetwork = resolvePaymentNetwork();
 
+/** Mutable runtime payment settings (dev UI can switch sandbox ↔ devnet). */
+let runtimeNetwork: PaymentNetwork = paymentNetwork;
+let runtimeRpcOverride: string | undefined = process.env.SOLANA_RPC_URL || undefined;
+let runtimeMintOverride: string | undefined = process.env.USDC_MINT || undefined;
+
+function refreshPaymentDerived() {
+  config.paymentNetwork = runtimeNetwork;
+  config.solanaRpcUrl = runtimeRpcOverride || defaultRpc(runtimeNetwork);
+  config.usdcMint = runtimeMintOverride || defaultUsdcMint(runtimeNetwork);
+}
+
 export const config = {
   product: 'SolVamos Studio',
   version: '0.7.0',
@@ -66,15 +80,41 @@ export const config = {
   orgId: process.env.SOLVAMOS_ORG_ID || '',
   customersFolderId: process.env.SOLVAMOS_CUSTOMERS_FOLDER_ID || '',
   billingAccount: process.env.SOLVAMOS_BILLING_ACCOUNT || '',
-  provisionMode: (process.env.PROVISION_MODE || 'mock') as 'mock' | 'terraform-only' | 'live',
+  /**
+   * mock | shared | terraform-only | live
+   * - shared/mock: single GOOGLE_CLOUD_PROJECT (dev, no org billing)
+   * - live + TENANCY_MODE=isolated: create cust-*-prod under Org
+   */
+  provisionMode: (process.env.PROVISION_MODE || 'shared') as
+    | 'mock'
+    | 'shared'
+    | 'terraform-only'
+    | 'live',
+  /** shared (dev) | isolated (product per-customer project) */
+  tenancyMode: (() => {
+    const t = (process.env.TENANCY_MODE || '').toLowerCase();
+    if (t === 'isolated' || t === 'per-customer' || t === 'product') return 'isolated' as const;
+    return 'shared' as const;
+  })(),
+  /**
+   * Product: create cust-* GCP projects under Org on account/tenant create.
+   * DISABLED by default (no org billing yet). Keep logic; do not call until true.
+   */
+  enableOrgProjectCreate: bool('ENABLE_ORG_PROJECT_CREATE', false),
+  /** Lab: on tenant create, deploy Cloud Run service inside shared project */
+  deployTenantCloudRun: bool('DEPLOY_TENANT_CLOUD_RUN', true),
+  cloudRunRegion: process.env.CLOUD_RUN_REGION || 'asia-northeast3',
+  /** Image from Artifact Registry after first platform build */
+  sharedCloudRunImage: process.env.SHARED_CLOUD_RUN_IMAGE || '',
+  cloudRunMinInstances: Math.max(0, Number(process.env.CLOUD_RUN_MIN_INSTANCES || 1)),
 
   /** Dev only — never true on Cloud Run prod */
   allowLocalVaultFallback: bool('ALLOW_LOCAL_VAULT_FALLBACK', process.env.NODE_ENV !== 'production'),
   allowPaymentBypass: bool('ALLOW_PAYMENT_BYPASS', process.env.NODE_ENV !== 'production'),
 
-  paymentNetwork,
-  solanaRpcUrl: defaultRpc(paymentNetwork),
-  usdcMint: defaultUsdcMint(paymentNetwork),
+  paymentNetwork: runtimeNetwork as PaymentNetwork,
+  solanaRpcUrl: defaultRpc(runtimeNetwork),
+  usdcMint: defaultUsdcMint(runtimeNetwork),
   /** Platform take-rate (0.1 = 10%). Rest goes to agent vault. */
   platformFeeShare: Math.min(1, Math.max(0, Number(process.env.PLATFORM_FEE_SHARE || 0.1))),
   /**
@@ -85,8 +125,72 @@ export const config = {
   platformTreasuryPubkey:
     process.env.PLATFORM_TREASURY_PUBKEY ||
     'AoUNKE8uQ8y1FEtU6YSFCsopK9veP6jZ6EGNoULjdwva',
+  /**
+   * Default A2A / agent vault pubkey when creating an agent without a linked user wallet override.
+   * Lab demo address — replace per tenant in production.
+   */
+  defaultAgentVaultPubkey:
+    process.env.DEFAULT_AGENT_VAULT_PUBKEY ||
+    '6xP7XpU6ZqUvS9uN8tV7nN8dM9pU8vS7nN9tU8vS7nN9',
   defaultAgentFeeUsdc: Number(process.env.DEFAULT_AGENT_FEE_USDC || 0.001),
 };
+
+/** Switch payment network at runtime (blocked in production). */
+export function setPaymentNetwork(
+  network: PaymentNetwork,
+  opts?: { rpcUrl?: string; usdcMint?: string }
+): { ok: boolean; error?: string } {
+  if (config.isProd) {
+    return { ok: false, error: 'Runtime payment network switch is disabled in production' };
+  }
+  if (network !== 'sandbox' && network !== 'localnet' && network !== 'devnet') {
+    return { ok: false, error: 'network must be sandbox | localnet | devnet' };
+  }
+  runtimeNetwork = network;
+  if (opts?.rpcUrl) runtimeRpcOverride = opts.rpcUrl;
+  else if (network === 'devnet') runtimeRpcOverride = process.env.SOLANA_RPC_URL || undefined;
+  else if (network === 'sandbox') runtimeRpcOverride = process.env.PAYSH_SANDBOX_RPC || process.env.SOLANA_RPC_URL || undefined;
+  else runtimeRpcOverride = process.env.SOLANA_RPC_URL || undefined;
+
+  if (opts?.usdcMint) runtimeMintOverride = opts.usdcMint;
+  else runtimeMintOverride = process.env.USDC_MINT || undefined;
+
+  refreshPaymentDerived();
+  console.log(
+    `[payment] network → ${config.paymentNetwork} rpc=${config.solanaRpcUrl} mint=${config.usdcMint}`
+  );
+  return { ok: true };
+}
+
+export function paymentNetworkInfo() {
+  return {
+    paymentNetwork: config.paymentNetwork,
+    networkLabel: networkLabel(),
+    solanaRpcUrl: config.solanaRpcUrl,
+    usdcMint: config.usdcMint,
+    platformTreasuryPubkey: config.platformTreasuryPubkey,
+    platformFeeShare: config.platformFeeShare,
+    allowPaymentBypass: config.allowPaymentBypass,
+    sandboxProofsAllowed: config.paymentNetwork === 'sandbox' || config.allowPaymentBypass,
+    modes: [
+      {
+        id: 'sandbox' as const,
+        label: 'Sandbox (테스트)',
+        description: 'pay.sh 로컬 증명 PAYSH_LOCAL_ / PAYSH_A2A_ — 체인 없이 UX·A2A 테스트',
+      },
+      {
+        id: 'devnet' as const,
+        label: 'Devnet (프로덕트)',
+        description: 'Solana Devnet 실 USDC 트랜잭션 서명 검증 — 제품 경로',
+      },
+      {
+        id: 'localnet' as const,
+        label: 'Localnet',
+        description: 'solana-test-validator + 로컬 USDC mint',
+      },
+    ],
+  };
+}
 
 export function assertProductionSafety() {
   if (!config.isProd) return;

@@ -73,6 +73,11 @@ VERTEX AI RAG SEARCH AND CONTEXT DIRECTIVES:
 - Prioritize factual data from the linked Google Drive / Vertex AI Search data store.
 - Avoid hallucinatory extensions. If context is insufficient, return structured status: "insufficient_grounded_data".
 - Format outputs for A2A JSON. Include a confidence index between 0.00 and 1.00.
+
+A2A / pay.sh COMMERCE:
+- You participate in agent-to-agent commerce. Peers discover you only if you are listed on the pay.sh Solana catalog.
+- When helping a human, you may need specialty knowledge from another listed agent — the runtime pays that peer in USDC (x402) and injects their answer as peer intel.
+- Credit paid peers when you use their information. Do not claim unpaid access to other agents' private Drive corpora.
 =========================================
 `;
 }

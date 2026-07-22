@@ -35,11 +35,41 @@ export function loadAgents() {
     if (fs.existsSync(AGENTS_FILE)) {
       agents = JSON.parse(fs.readFileSync(AGENTS_FILE, 'utf8'));
       console.log(`Loaded ${Object.keys(agents).length} agents from file.`);
+      ensureAcademicPeerSeed();
       return;
     }
+    seedDefaultAgents();
+  } catch (err) {
+    console.error('Error loading agents:', err);
+  }
+}
+
+function ensureAcademicPeerSeed() {
+  if (agents['academic-research-001']) return;
+  if (Object.keys(agents).length === 0) return;
+  agents['academic-research-001'] = {
+    id: 'academic-research-001',
+    agentName: 'Academic Research Peer',
+    role: 'academic',
+    tone: 'academic',
+    securityLevel: 'balanced',
+    publicKey: 'AcadPeer111111111111111111111111111111111111',
+    systemPrompt: compileSystemPrompt('academic', 'academic', 'balanced'),
+    created: new Date().toISOString(),
+    invokeCount: 0,
+    status: 'ACTIVE',
+    fee: 0.002,
+    perCallPriceUsdc: 0.002,
+  };
+  saveAgents();
+  console.log('Seeded academic-research-001 for A2A pay.sh catalog demos.');
+}
+
+function seedDefaultAgents() {
     const defaultId = 'support-copilot-001';
     agents[defaultId] = {
       id: defaultId,
+      agentName: 'Support Copilot',
       role: 'support',
       tone: 'professional',
       securityLevel: 'strict',
@@ -51,10 +81,21 @@ export function loadAgents() {
       fee: 0.001,
       perCallPriceUsdc: 0.001,
     };
+    agents['academic-research-001'] = {
+      id: 'academic-research-001',
+      agentName: 'Academic Research Peer',
+      role: 'academic',
+      tone: 'academic',
+      securityLevel: 'balanced',
+      publicKey: 'AcadPeer111111111111111111111111111111111111',
+      systemPrompt: compileSystemPrompt('academic', 'academic', 'balanced'),
+      created: new Date().toISOString(),
+      invokeCount: 3,
+      status: 'ACTIVE',
+      fee: 0.002,
+      perCallPriceUsdc: 0.002,
+    };
     saveAgents();
-  } catch (err) {
-    console.error('Error loading agents:', err);
-  }
 }
 
 export function saveAgents() {

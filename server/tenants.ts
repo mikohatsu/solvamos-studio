@@ -15,8 +15,14 @@ export type TenantRecord = {
   createdAt: string;
   kmsKeyId?: string;
   cloudRunUri?: string;
+  cloudRunServiceName?: string;
+  cloudRunStatus?: 'active' | 'pending_image' | 'skipped' | 'error' | string;
   errorMessage?: string;
   byoProject?: boolean;
+  /** shared = one PoC GCP project; isolated = cust-{id}-prod under Org */
+  tenancyMode?: 'shared' | 'isolated';
+  sharedProject?: boolean;
+  provisionNotes?: string[];
 };
 
 const TENANTS_FILE = path.join(process.cwd(), 'tenants_db.json');

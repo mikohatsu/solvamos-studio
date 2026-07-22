@@ -3,9 +3,6 @@
  */
 import { FormEvent, RefObject } from 'react';
 import {
-  Folder,
-  FolderOpen,
-  CheckCircle2,
   Plus,
   Shield,
   Rocket,
@@ -16,7 +13,8 @@ import {
   RefreshCw,
   Lock,
 } from 'lucide-react';
-import { Agent, DriveFolder, Message, PromptOptions } from '../types';
+import { Agent, DriveItem, DrivePathCrumb, Message, PromptOptions } from '../types';
+import DriveBrowser from '../components/DriveBrowser';
 
 const ROLES: { id: PromptOptions['role']; label: string }[] = [
   { id: 'custom', label: '🏢 사내 HR/복지 안내' },
@@ -53,11 +51,21 @@ type Props = {
   creationResult: any;
   onCreate: () => void;
   driveEmail: string | null;
-  driveFolders: DriveFolder[];
+  primaryWalletAddress?: string | null;
+  primaryWalletLabel?: string | null;
+  driveItems: DriveItem[];
+  drivePath: DrivePathCrumb[];
   selectedFolderId: string;
+  selectedDriveName?: string | null;
+  selectedDriveKind?: 'folder' | 'file' | null;
   setSelectedFolderId: (id: string) => void;
   driveBusy: boolean;
+  driveError?: string | null;
   onConnectDrive: () => void;
+  onRefreshDrive?: () => void;
+  onNavigateDrive: (folderId: string, folderName: string) => void;
+  onNavigateDriveCrumb: (index: number) => void;
+  onSelectDriveItem: (item: DriveItem) => void;
   tenantIdInput: string;
   setTenantIdInput: (v: string) => void;
   activeAgent: Agent | null;
@@ -88,11 +96,20 @@ export default function StudioPage(props: Props) {
     creationResult,
     onCreate,
     driveEmail,
-    driveFolders,
+    primaryWalletAddress,
+    primaryWalletLabel,
+    driveItems,
+    drivePath,
     selectedFolderId,
-    setSelectedFolderId,
+    selectedDriveName,
+    selectedDriveKind,
     driveBusy,
+    driveError,
     onConnectDrive,
+    onRefreshDrive,
+    onNavigateDrive,
+    onNavigateDriveCrumb,
+    onSelectDriveItem,
     tenantIdInput,
     setTenantIdInput,
     activeAgent,
@@ -114,7 +131,10 @@ export default function StudioPage(props: Props) {
 
   const messages = activeAgent ? chatHistory[activeAgent.id] || [] : [];
   const fee = options.fee ?? 0.001;
-  const walletShort = activeAgent?.publicKey
+  const myWalletShort = primaryWalletAddress
+    ? `${primaryWalletAddress.slice(0, 4)}...${primaryWalletAddress.slice(-4)}`
+    : null;
+  const agentVaultShort = activeAgent?.publicKey
     ? `${activeAgent.publicKey.slice(0, 4)}...${activeAgent.publicKey.slice(-4)}`
     : null;
 
@@ -153,57 +173,47 @@ export default function StudioPage(props: Props) {
             ) : (
               <span className="text-outline">Drive 미연결</span>
             )}
+            {primaryWalletAddress ? (
+              <span className="text-solana-green font-mono text-xs">
+                내 지갑: {primaryWalletLabel || '메인'} · {primaryWalletAddress.slice(0, 4)}…
+                {primaryWalletAddress.slice(-4)}
+              </span>
+            ) : (
+              <span className="text-outline text-xs">내 지갑 미연결 (헤더 Connect Wallet)</span>
+            )}
           </div>
 
-          <div className="space-y-2">
-            {driveFolders.length === 0 && (
+          <div className="mb-4">
+            {driveEmail ? (
+              <DriveBrowser
+                items={driveItems}
+                path={drivePath}
+                selectedId={selectedFolderId}
+                selectedName={selectedDriveName}
+                selectedKind={selectedDriveKind}
+                busy={driveBusy}
+                error={driveError}
+                onNavigate={onNavigateDrive}
+                onNavigateCrumb={onNavigateDriveCrumb}
+                onSelect={onSelectDriveItem}
+                emptyHint="이 위치에 폴더/파일이 없습니다. 상위 폴더로 이동하거나 Drive에서 항목을 추가하세요."
+              />
+            ) : (
               <p className="text-sm text-on-surface-variant py-2">
-                Google Drive를 연결하면 폴더 목록이 표시됩니다. 없이도 에이전트 생성은 가능합니다.
+                Google Drive를 연결하면 폴더·파일을 탐색하고 지식 기반으로 선택할 수 있습니다.
+                없이도 에이전트 생성은 가능합니다.
               </p>
             )}
-            {driveFolders.map((folder) => {
-              const selected = selectedFolderId === folder.id;
-              return (
-                <button
-                  key={folder.id}
-                  type="button"
-                  onClick={() => setSelectedFolderId(selected ? '' : folder.id)}
-                  className={
-                    selected
-                      ? 'w-full flex items-center justify-between p-4 rounded-lg bg-google-blue/10 border border-google-blue/30 cursor-pointer text-left'
-                      : 'w-full flex items-center justify-between p-4 rounded-lg bg-surface-container-high border border-outline-variant/20 hover:border-outline-variant/50 transition-colors cursor-pointer text-left'
-                  }
-                >
-                  <div className="flex items-center gap-4">
-                    {selected ? (
-                      <FolderOpen className="w-5 h-5 text-google-blue" />
-                    ) : (
-                      <Folder className="w-5 h-5 text-on-surface-variant" />
-                    )}
-                    <span
-                      className={
-                        selected
-                          ? 'text-on-surface font-medium'
-                          : 'text-on-surface-variant'
-                      }
-                    >
-                      {folder.name}
-                    </span>
-                  </div>
-                  {selected && <CheckCircle2 className="w-5 h-5 text-solana-green" />}
-                </button>
-              );
-            })}
           </div>
 
           <button
             type="button"
             disabled={driveBusy}
-            onClick={onConnectDrive}
-            className="mt-6 flex items-center justify-center gap-2 w-full py-3 rounded-lg border border-google-blue text-google-blue hover:bg-google-blue/10 transition-colors text-sm font-medium disabled:opacity-50"
+            onClick={driveEmail && onRefreshDrive ? onRefreshDrive : onConnectDrive}
+            className="flex items-center justify-center gap-2 w-full py-3 rounded-lg border border-google-blue text-google-blue hover:bg-google-blue/10 transition-colors text-sm font-medium disabled:opacity-50"
           >
             <Plus className="w-4 h-4" />
-            {driveEmail ? 'Google Drive 폴더 새로고침' : 'Google Drive 폴더 추가하기'}
+            {driveEmail ? '현재 폴더 새로고침' : 'Google Drive 연결하기'}
           </button>
         </section>
 
@@ -411,30 +421,61 @@ export default function StudioPage(props: Props) {
                 <Lock className="w-4 h-4" />
                 pay.sh 결제 필요 · {pendingPayment.amount} {pendingPayment.token}
               </div>
+              <p className="text-[11px] text-on-surface-variant">
+                모드:{' '}
+                <span className="text-on-surface font-medium">
+                  {serverStatus?.paymentNetwork === 'devnet'
+                    ? 'Devnet (제품)'
+                    : serverStatus?.paymentNetwork === 'sandbox'
+                      ? 'Sandbox (테스트)'
+                      : serverStatus?.paymentNetwork || '—'}
+                </span>
+                {' · '}vault{' '}
+                <span className="font-mono text-[10px]">
+                  {pendingPayment.recipientWallet.slice(0, 8)}…
+                </span>
+              </p>
+              {serverStatus?.paymentNetwork === 'devnet' && (
+                <p className="text-[11px] text-amber-300/90 leading-relaxed">
+                  Devnet: 에이전트 vault(+ 플랫폼 10% treasury)로 USDC를 보낸 뒤 트랜잭션
+                  서명을 붙여넣으세요. Sandbox 버튼은 이 모드에서 거부됩니다.
+                </p>
+              )}
               <input
                 value={customSignature}
                 onChange={(e) => setCustomSignature(e.target.value)}
-                placeholder="온체인 서명 붙여넣기 (선택)"
+                placeholder={
+                  serverStatus?.paymentNetwork === 'devnet'
+                    ? 'Devnet USDC tx signature 붙여넣기'
+                    : '온체인 서명 붙여넣기 (선택)'
+                }
                 className="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-3 py-1.5 text-xs font-mono input-glow focus:outline-none"
               />
               <div className="flex gap-2">
-                <button
-                  type="button"
-                  disabled={isVerifyingPayment}
-                  onClick={() => onAcknowledgeAndSign(true)}
-                  className="flex-1 btn-primary rounded-lg py-2 text-xs font-medium disabled:opacity-50"
-                >
-                  {serverStatus?.paymentNetwork === 'sandbox'
-                    ? 'Sandbox 증명 전송'
-                    : 'Mock 증명 전송'}
-                </button>
+                {(serverStatus?.paymentNetwork === 'sandbox' ||
+                  serverStatus?.sandboxProofsAllowed) && (
+                  <button
+                    type="button"
+                    disabled={isVerifyingPayment}
+                    onClick={() => onAcknowledgeAndSign(true)}
+                    className="flex-1 btn-primary rounded-lg py-2 text-xs font-medium disabled:opacity-50"
+                  >
+                    Sandbox 증명 전송
+                  </button>
+                )}
                 <button
                   type="button"
                   disabled={isVerifyingPayment || !customSignature.trim()}
                   onClick={() => onAcknowledgeAndSign(false)}
-                  className="flex-1 border border-google-blue text-google-blue rounded-lg py-2 text-xs font-medium hover:bg-google-blue/10 disabled:opacity-50"
+                  className={
+                    serverStatus?.paymentNetwork === 'devnet'
+                      ? 'flex-1 btn-primary rounded-lg py-2 text-xs font-medium disabled:opacity-50'
+                      : 'flex-1 border border-google-blue text-google-blue rounded-lg py-2 text-xs font-medium hover:bg-google-blue/10 disabled:opacity-50'
+                  }
                 >
-                  서명으로 전송
+                  {serverStatus?.paymentNetwork === 'devnet'
+                    ? 'Devnet 서명으로 결제'
+                    : '서명으로 전송'}
                 </button>
               </div>
               {paymentLogs.length > 0 && (
@@ -469,30 +510,54 @@ export default function StudioPage(props: Props) {
           </form>
         </section>
 
-        <section className="glass-panel rounded-xl p-4 border border-outline-variant/20">
+                <section className="glass-panel rounded-xl p-4 border border-outline-variant/20">
           <div className="flex flex-col gap-2">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center gap-2">
               <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
-                연결된 지갑
+                내 지갑
               </span>
-              {walletShort ? (
+              {myWalletShort && primaryWalletAddress ? (
                 <button
                   type="button"
-                  onClick={() => onCopy(activeAgent!.publicKey, 'vault')}
+                  onClick={() => onCopy(primaryWalletAddress, 'my-wallet')}
                   className="flex items-center gap-1 bg-surface-container-highest px-2 py-1 rounded-md text-xs font-mono text-on-surface"
                 >
                   <span className="h-2 w-2 rounded-full bg-solana-green" />
-                  {walletShort}
-                  {copiedId === 'vault' ? (
+                  {primaryWalletLabel ? `${primaryWalletLabel} · ` : ''}
+                  {myWalletShort}
+                  {copiedId === 'my-wallet' ? (
                     <Check className="w-3 h-3 text-solana-green" />
                   ) : (
                     <Copy className="w-3 h-3" />
                   )}
                 </button>
               ) : (
-                <span className="text-xs text-outline">—</span>
+                <span className="text-xs text-outline">미연결 (헤더 Connect Wallet)</span>
               )}
             </div>
+            {activeAgent && agentVaultShort && (
+              <>
+                <div className="h-px w-full bg-outline-variant/20" />
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
+                    에이전트 A2A vault
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onCopy(activeAgent.publicKey, 'agent-vault')}
+                    className="flex items-center gap-1 bg-surface-container-highest px-2 py-1 rounded-md text-xs font-mono text-on-surface-variant"
+                    title="에이전트 간 결제용 주소 (생성 시 기본 vault)"
+                  >
+                    {agentVaultShort}
+                    {copiedId === 'agent-vault' ? (
+                      <Check className="w-3 h-3 text-solana-green" />
+                    ) : (
+                      <Copy className="w-3 h-3" />
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
             <div className="h-px w-full bg-outline-variant/20" />
             <div className="flex justify-between items-center">
               <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
@@ -503,6 +568,20 @@ export default function StudioPage(props: Props) {
                 {serverStatus?.geminiConfigured ? 'Gemini OK' : 'Gemini unset'}
               </span>
             </div>
+            <div className="h-px w-full bg-outline-variant/20" />
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
+                pay.sh catalog
+              </span>
+              <span className="text-xs text-primary">
+                {serverStatus?.payShCatalogListings ?? '—'} listed · A2A{' '}
+                {serverStatus?.a2aEnabled ? 'on' : 'off'}
+              </span>
+            </div>
+            <p className="text-[11px] text-on-surface-variant leading-relaxed mt-1">
+              사람→에이전트 대화 중, 필요하면 pay.sh 카탈로그에 등재된 다른 에이전트를 USDC로
+              유료 호출해 정보를 가져옵니다.
+            </p>
           </div>
         </section>
       </div>

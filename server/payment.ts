@@ -20,6 +20,7 @@ function isSandboxProof(signature: string): boolean {
     signature.startsWith('MOCK_TX_') ||
     signature.startsWith('SANDBOX_TX_') ||
     signature.startsWith('PAYSH_LOCAL_') ||
+    signature.startsWith('PAYSH_A2A_') ||
     signature === 'SOLVAMOS_TEST_SIGNATURE'
   );
 }

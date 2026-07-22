@@ -4,22 +4,20 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Agent, DriveFolder, Message, PromptOptions, Settlement } from './types';
+import { Agent, DriveItem, DrivePathCrumb, Message, PromptOptions, Settlement } from './types';
 import Landing from './Landing';
 import AppShell, { AppTab } from './AppShell';
 import StudioPage from './pages/StudioPage';
 import AgentsPage from './pages/AgentsPage';
 import SettlementsPage from './pages/SettlementsPage';
+import WalletModal, { type WalletRow } from './components/WalletModal';
 
 export default function App() {
-  const [view, setView] = useState<'landing' | 'studio'>(() =>
-    localStorage.getItem('solvamos_entered') === '1' ||
-    new URLSearchParams(window.location.search).has('drive_connected')
-      ? 'studio'
-      : 'landing'
-  );
+  const [view, setView] = useState<'landing' | 'studio' | 'boot'>('boot');
   const [landingBusy, setLandingBusy] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<AppTab>('studio');
+  const [networkSwitchBusy, setNetworkSwitchBusy] = useState(false);
 
   const [agents, setAgents] = useState<Agent[]>([]);
   const [activeAgent, setActiveAgent] = useState<Agent | null>(null);
@@ -87,20 +85,48 @@ export default function App() {
     () => localStorage.getItem('solvamos_drive_session') || ''
   );
   const [driveEmail, setDriveEmail] = useState<string | null>(null);
-  const [driveFolders, setDriveFolders] = useState<DriveFolder[]>([]);
+  const [userName, setUserName] = useState<string | null>(null);
+  const [userPicture, setUserPicture] = useState<string | null>(null);
+  const [driveItems, setDriveItems] = useState<DriveItem[]>([]);
+  const [drivePath, setDrivePath] = useState<DrivePathCrumb[]>([]);
+  const [driveParentId, setDriveParentId] = useState('root');
   const [selectedFolderId, setSelectedFolderId] = useState('');
+  const [selectedDriveName, setSelectedDriveName] = useState<string | null>(null);
+  const [selectedDriveKind, setSelectedDriveKind] = useState<'folder' | 'file' | null>(null);
   const [driveBusy, setDriveBusy] = useState(false);
+  const [driveError, setDriveError] = useState<string | null>(null);
   const [tenantIdInput, setTenantIdInput] = useState('demo');
+
+  const [wallets, setWallets] = useState<WalletRow[]>([]);
+  const [primaryWallet, setPrimaryWallet] = useState<WalletRow | null>(null);
+  const [walletModalOpen, setWalletModalOpen] = useState(false);
+  const [walletBusy, setWalletBusy] = useState(false);
+  const [walletError, setWalletError] = useState<string | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  const authFetch = (url: string, init?: RequestInit) => {
+    const sid =
+      (typeof window !== 'undefined' && localStorage.getItem('solvamos_drive_session')) ||
+      driveSessionId;
+    return fetch(url, {
+      ...init,
+      credentials: 'include',
+      cache: 'no-store',
+      headers: {
+        ...(init?.headers || {}),
+        ...(sid ? { 'X-SolVamos-Session': sid } : {}),
+      },
+    });
+  };
+
   const fetchStatusAndAgents = async () => {
     try {
-      const statusRes = await fetch('/api/status');
+      const statusRes = await fetch('/api/status', { cache: 'no-store' });
       const statusData = await statusRes.json();
       setServerStatus(statusData);
 
-      const agentsRes = await fetch('/api/agents');
+      const agentsRes = await fetch('/api/agents', { cache: 'no-store' });
       const agentsData = await agentsRes.json();
       if (agentsData.status === 'success') {
         setAgents(agentsData.data);
@@ -108,63 +134,236 @@ export default function App() {
           setActiveAgent(agentsData.data[0]);
         }
       }
+      return statusData;
     } catch (err) {
       console.error('Failed to connect to backend api:', err);
+      return null;
     }
   };
 
-  const refreshDriveSession = async (sessionId: string) => {
-    if (!sessionId) return;
-    try {
-      const res = await fetch(
-        `/api/auth/google/session?session=${encodeURIComponent(sessionId)}`
-      );
-      const data = await res.json();
-      if (data.connected) {
-        setDriveEmail(data.email);
-        localStorage.setItem('solvamos_drive_session', sessionId);
-        setDriveSessionId(sessionId);
-        const foldersRes = await fetch(
-          `/api/drive/folders?session=${encodeURIComponent(sessionId)}`
-        );
-        const foldersData = await foldersRes.json();
-        if (foldersData.status === 'success') {
-          setDriveFolders(foldersData.data || []);
-        }
-      }
-    } catch (err) {
-      console.error('Drive session refresh failed', err);
+  const applyAuthUser = (data: any, sessionId?: string) => {
+    if (!data?.connected && !data?.user?.connected) return false;
+    const email = data.email || data.user?.email || null;
+    const name = data.name || data.user?.name || null;
+    const picture = data.picture || data.user?.picture || null;
+    const tenantId = data.tenantId || data.user?.tenantId || null;
+    setDriveEmail(email);
+    setUserName(name);
+    setUserPicture(picture);
+    if (tenantId) setTenantIdInput(tenantId);
+    if (sessionId) {
+      localStorage.setItem('solvamos_drive_session', sessionId);
+      setDriveSessionId(sessionId);
     }
+    localStorage.setItem('solvamos_entered', '1');
+    return true;
   };
 
-  const connectGoogleDrive = async () => {
+  const loadDriveFolders = async (sessionId?: string, parentId = 'root') => {
+    setDriveError(null);
     setDriveBusy(true);
     try {
-      const res = await fetch('/api/auth/google');
+      const q = new URLSearchParams();
+      if (sessionId) q.set('session', sessionId);
+      q.set('parent', parentId);
+      const foldersRes = await authFetch(`/api/drive/folders?${q.toString()}`);
+      const foldersData = await foldersRes.json();
+      if (foldersData.status === 'success') {
+        const items: DriveItem[] = (foldersData.data || []).map((f: any) => ({
+          ...f,
+          kind:
+            f.kind ||
+            (f.mimeType === 'application/vnd.google-apps.folder' ? 'folder' : 'file'),
+        }));
+        setDriveItems(items);
+        setDriveParentId(parentId);
+        if (!items.length) {
+          setDriveError(null);
+        }
+      } else {
+        setDriveError(
+          `${foldersData.message || 'Drive 폴더를 불러오지 못했습니다.'}${
+            foldersData.hint ? `\n${foldersData.hint}` : ''
+          }`
+        );
+      }
+    } catch (err) {
+      console.error('Drive folders failed', err);
+      setDriveError('Drive 폴더 요청 실패');
+    } finally {
+      setDriveBusy(false);
+    }
+  };
+
+  const navigateDriveFolder = async (folderId: string, folderName: string) => {
+    setDrivePath((prev) => [...prev, { id: folderId, name: folderName }]);
+    await loadDriveFolders(undefined, folderId);
+  };
+
+  const navigateDriveCrumb = async (index: number) => {
+    if (index < 0) {
+      setDrivePath([]);
+      await loadDriveFolders(undefined, 'root');
+      return;
+    }
+    const next = drivePath.slice(0, index + 1);
+    setDrivePath(next);
+    await loadDriveFolders(undefined, next[next.length - 1].id);
+  };
+
+  const selectDriveItem = (item: DriveItem) => {
+    const kind =
+      item.kind ||
+      (item.mimeType === 'application/vnd.google-apps.folder' ? 'folder' : 'file');
+    if (selectedFolderId === item.id) {
+      setSelectedFolderId('');
+      setSelectedDriveName(null);
+      setSelectedDriveKind(null);
+      return;
+    }
+    setSelectedFolderId(item.id);
+    setSelectedDriveName(item.name);
+    setSelectedDriveKind(kind);
+  };
+
+  const fetchWallets = async () => {
+    try {
+      const res = await authFetch('/api/wallets');
+      const data = await res.json();
+      if (data.status === 'success') {
+        setWallets(data.data || []);
+        setPrimaryWallet(data.primary || null);
+      }
+    } catch (err) {
+      console.error('wallets fetch failed', err);
+    }
+  };
+
+  const addUserWallet = async (address: string, label: string, source?: string) => {
+    setWalletBusy(true);
+    setWalletError(null);
+    try {
+      const res = await authFetch('/api/wallets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address, label, source, makePrimary: true }),
+      });
+      const data = await res.json();
+      if (data.status !== 'success') throw new Error(data.message || '등록 실패');
+      setWallets(data.data || []);
+      setPrimaryWallet(data.primary || null);
+    } finally {
+      setWalletBusy(false);
+    }
+  };
+
+  const setUserPrimaryWallet = async (id: string) => {
+    setWalletBusy(true);
+    setWalletError(null);
+    try {
+      const res = await authFetch(`/api/wallets/${id}/primary`, { method: 'POST' });
+      const data = await res.json();
+      if (data.status !== 'success') throw new Error(data.message || '설정 실패');
+      setWallets(data.data || []);
+      setPrimaryWallet(data.primary || null);
+    } catch (err: any) {
+      setWalletError(err.message);
+    } finally {
+      setWalletBusy(false);
+    }
+  };
+
+  const removeUserWallet = async (id: string) => {
+    setWalletBusy(true);
+    setWalletError(null);
+    try {
+      const res = await authFetch(`/api/wallets/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.status !== 'success') throw new Error(data.message || '삭제 실패');
+      setWallets(data.data || []);
+      setPrimaryWallet(data.primary || null);
+    } catch (err: any) {
+      setWalletError(err.message);
+    } finally {
+      setWalletBusy(false);
+    }
+  };
+
+  const refreshAuthSession = async (sessionId?: string) => {
+    try {
+      const sid =
+        sessionId ||
+        driveSessionId ||
+        localStorage.getItem('solvamos_drive_session') ||
+        undefined;
+      const res = await authFetch('/api/auth/me', {
+        headers: sid ? { 'X-SolVamos-Session': sid } : undefined,
+      });
+      const data = await res.json();
+      if (applyAuthUser(data, data.sessionId || sid)) {
+        setView('studio');
+        await loadDriveFolders(data.sessionId || sid);
+        await fetchWallets();
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Auth session refresh failed', err);
+      return false;
+    }
+  };
+
+  /** Start Google SSO (redirect) or ADC lab connect. */
+  const connectGoogleDrive = async () => {
+    setDriveBusy(true);
+    setAuthError(null);
+    try {
+      const res = await authFetch('/api/auth/google');
       const data = await res.json();
       if (data.status !== 'success') {
-        alert(
-          `${data.message || 'Google Drive auth failed'}\n\n${data.hint || ''}`
+        setAuthError(
+          `${data.message || 'Google 로그인 실패'}${data.hint ? `\n\n${data.hint}` : ''}`
         );
         return;
       }
 
-      localStorage.setItem('solvamos_drive_session', data.sessionId);
-      setDriveSessionId(data.sessionId);
+      if (data.sessionId) {
+        localStorage.setItem('solvamos_drive_session', data.sessionId);
+        setDriveSessionId(data.sessionId);
+      }
 
       // Local ADC PoC: no browser redirect
       if (data.mode === 'adc' || !data.authUrl) {
-        localStorage.setItem('solvamos_entered', '1');
+        applyAuthUser(data, data.sessionId);
         setView('studio');
-        if (data.email) setDriveEmail(data.email);
-        await refreshDriveSession(data.sessionId);
+        await loadDriveFolders(data.sessionId);
         return;
       }
 
       window.location.href = data.authUrl;
     } catch (err) {
       console.error(err);
-      alert('Failed to start Google OAuth');
+      setAuthError('Google OAuth를 시작하지 못했습니다.');
+    } finally {
+      setDriveBusy(false);
+    }
+  };
+
+  /** Reload Drive folders only — do not start a new OAuth redirect. */
+  const refreshDriveFolders = async () => {
+    setDriveBusy(true);
+    try {
+      const sid =
+        driveSessionId || localStorage.getItem('solvamos_drive_session') || undefined;
+      const me = await authFetch('/api/auth/me', {
+        headers: sid ? { 'X-SolVamos-Session': sid } : undefined,
+      });
+      const data = await me.json();
+      if (!applyAuthUser(data, data.sessionId || sid)) {
+        setDriveError('세션이 만료되었습니다. Google로 다시 로그인하세요.');
+        return;
+      }
+      await loadDriveFolders(data.sessionId || sid, driveParentId || 'root');
     } finally {
       setDriveBusy(false);
     }
@@ -172,44 +371,79 @@ export default function App() {
 
   const enterWorkspace = async () => {
     setLandingBusy(true);
+    setAuthError(null);
     try {
-      if (serverStatus?.oauthConfigured || serverStatus?.driveAuthAvailable) {
-        await connectGoogleDrive();
-        return;
-      }
-      localStorage.setItem('solvamos_entered', '1');
-      setView('studio');
+      await connectGoogleDrive();
     } finally {
       setLandingBusy(false);
     }
   };
 
-  const logout = () => {
+  const enterDevSkip = () => {
+    localStorage.setItem('solvamos_entered', '1');
+    setView('studio');
+  };
+
+  const logout = async () => {
+    try {
+      await authFetch('/api/auth/logout', { method: 'POST' });
+    } catch {
+      /* ignore */
+    }
     localStorage.removeItem('solvamos_entered');
     localStorage.removeItem('solvamos_drive_session');
     setView('landing');
     setDriveSessionId('');
     setDriveEmail(null);
-    setDriveFolders([]);
+    setUserName(null);
+    setUserPicture(null);
+    setDriveItems([]);
+    setDrivePath([]);
+    setDriveParentId('root');
+    setSelectedFolderId('');
+    setSelectedDriveName(null);
+    setSelectedDriveKind(null);
+    setDriveError(null);
+    setAuthError(null);
   };
 
   useEffect(() => {
-    fetchStatusAndAgents();
-    const params = new URLSearchParams(window.location.search);
-    const sessionFromUrl = params.get('session');
-    const connected = params.get('drive_connected');
-    if (sessionFromUrl) {
-      setDriveSessionId(sessionFromUrl);
-      localStorage.setItem('solvamos_drive_session', sessionFromUrl);
-      localStorage.setItem('solvamos_entered', '1');
-      setView('studio');
-      if (connected) {
-        window.history.replaceState({}, '', '/');
+    const boot = async () => {
+      const savedSid = localStorage.getItem('solvamos_drive_session') || '';
+      const entered = localStorage.getItem('solvamos_entered') === '1';
+      // Keep studio visible across refresh while we revalidate (no login flash)
+      if (entered && savedSid) {
+        setView('studio');
       }
-      refreshDriveSession(sessionFromUrl);
-    } else if (driveSessionId) {
-      refreshDriveSession(driveSessionId);
-    }
+
+      await fetchStatusAndAgents();
+      const params = new URLSearchParams(window.location.search);
+      const loggedIn =
+        params.get('logged_in') === '1' ||
+        params.get('drive_connected') === '1';
+      const sessionFromUrl = params.get('session');
+      const emailFromUrl = params.get('email');
+
+      if (loggedIn || sessionFromUrl) {
+        if (emailFromUrl) setDriveEmail(emailFromUrl);
+        if (sessionFromUrl) {
+          localStorage.setItem('solvamos_drive_session', sessionFromUrl);
+          setDriveSessionId(sessionFromUrl);
+        }
+        localStorage.setItem('solvamos_entered', '1');
+        window.history.replaceState({}, '', '/');
+        const ok = await refreshAuthSession(sessionFromUrl || savedSid || undefined);
+        if (ok) return;
+      }
+
+      const ok = await refreshAuthSession(savedSid || driveSessionId || undefined);
+      if (ok) return;
+
+      // Only kick to landing if session truly dead
+      localStorage.removeItem('solvamos_entered');
+      setView('landing');
+    };
+    void boot();
   }, []);
 
   useEffect(() => {
@@ -246,10 +480,18 @@ export default function App() {
             : options.customRole,
         googleDriveFolderId: selectedFolderId || undefined,
         tenantId: tenantIdInput || undefined,
+        usePrimaryWallet: false,
+        // Agent A2A vault defaults server-side to DEFAULT_AGENT_VAULT_PUBKEY
+        recipientWallet: undefined,
       };
       const res = await fetch('/api/agents/create', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        cache: 'no-store',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(driveSessionId ? { 'X-SolVamos-Session': driveSessionId } : {}),
+        },
         body: JSON.stringify(payload),
       });
       const data = await res.json();
@@ -357,14 +599,34 @@ export default function App() {
           [agentId]: [...(prev[agentId] || []), paywallMessage],
         }));
       } else if (data.status === 'success') {
+        const hops = (data.a2a?.peerHops || []).map((h: any) => ({
+          toName: h.toName,
+          toAgentId: h.toAgentId,
+          feeUsdc: h.feeUsdc,
+          paymentProof: h.paymentProof,
+          ok: !h.error && h.paymentVerified !== false,
+          error: h.error,
+        }));
+        const hopNote =
+          hops.length > 0
+            ? `\n\n---\n🔗 A2A pay.sh: ${hops.length} peer call(s)\n` +
+              hops
+                .map(
+                  (h: any) =>
+                    `• ${h.toName} · ${h.feeUsdc} USDC · ${h.ok ? 'paid ✓' : `fail: ${h.error}`}`
+                )
+                .join('\n')
+            : '';
+
         const agentResponse: Message = {
           id: Math.random().toString(36).substr(2, 9),
           sender: 'agent',
-          text: data.data,
+          text: `${data.data}${hopNote}`,
           timestamp: new Date().toLocaleTimeString(),
           confidence: data.confidence,
           paymentStatus: signature ? 'verified' : 'none',
           paymentTx: signature || undefined,
+          a2aHops: hops,
         };
 
         if (signature) {
@@ -442,6 +704,37 @@ export default function App() {
     }
   };
 
+  const switchPaymentNetwork = async (network: 'sandbox' | 'devnet') => {
+    setNetworkSwitchBusy(true);
+    try {
+      const res = await fetch('/api/payment/network', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ network }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.status !== 'success') {
+        alert(data.message || '결제 네트워크 전환 실패');
+        return;
+      }
+      await fetchStatusAndAgents();
+      setPendingPayment(null);
+      setPaymentLogs([
+        `[Payment mode] → ${data.paymentNetwork} (${data.networkLabel})`,
+        `RPC: ${data.solanaRpcUrl}`,
+        `USDC mint: ${data.usdcMint}`,
+        data.sandboxProofsAllowed
+          ? 'Sandbox proofs (PAYSH_LOCAL_ / PAYSH_A2A_) allowed'
+          : 'Devnet/product: paste a real USDC transfer signature',
+      ]);
+    } catch (err) {
+      console.error(err);
+      alert('결제 네트워크 전환 중 오류');
+    } finally {
+      setNetworkSwitchBusy(false);
+    }
+  };
+
   const handleAcknowledgeAndSign = async (useRandomSig = true) => {
     if (!pendingPayment) return;
     const net =
@@ -449,6 +742,12 @@ export default function App() {
 
     let signature: string;
     if (useRandomSig) {
+      if (net !== 'sandbox' && !serverStatus?.allowPaymentBypass && !serverStatus?.sandboxProofsAllowed) {
+        alert(
+          'Devnet(제품) 모드에서는 샌드박스/Mock 증명을 쓸 수 없습니다.\n에이전트 vault로 USDC를 보낸 뒤 트랜잭션 서명을 붙여넣으세요.\n또는 사이드바에서 Sandbox로 전환하세요.'
+        );
+        return;
+      }
       const prefix =
         net === 'sandbox' ? 'PAYSH_LOCAL_' : net === 'localnet' ? 'SANDBOX_TX_' : 'MOCK_TX_';
       signature = `${prefix}${Math.random().toString(36).substr(2, 10).toUpperCase()}_${Date.now().toString().slice(-4)}`;
@@ -457,15 +756,20 @@ export default function App() {
     }
 
     if (!signature) {
-      alert('Solana / pay.sh 트랜잭션 서명을 입력하세요.');
+      alert(
+        net === 'devnet'
+          ? 'Devnet USDC 트랜잭션 서명을 입력하세요.'
+          : 'Solana / pay.sh 트랜잭션 서명을 입력하세요.'
+      );
       return;
     }
 
     setPaymentLogs([
       `[Network] ${net}`,
-      `[Proof] ${useRandomSig ? 'Generated sandbox-style proof' : 'Pasted signature'}`,
+      `[Proof] ${useRandomSig ? 'Generated sandbox-style proof' : 'Pasted on-chain signature'}`,
       `Signature: ${signature}`,
       `Fee: ${pendingPayment.amount} ${pendingPayment.token}`,
+      `Recipient: ${pendingPayment.recipientWallet}`,
     ]);
 
     await invokeAgent(pendingPayment.agentId, pendingPayment.prompt, signature);
@@ -478,27 +782,48 @@ export default function App() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const walletHint = activeAgent?.publicKey
-    ? `${activeAgent.publicKey.slice(0, 4)}...${activeAgent.publicKey.slice(-4)}`
+  const walletHint = primaryWallet?.address
+    ? `${primaryWallet.label || 'Wallet'} · ${primaryWallet.address.slice(0, 4)}...${primaryWallet.address.slice(-4)}`
     : null;
+
+  if (view === 'boot') {
+    return (
+      <div className="min-h-screen bg-[#0F172A] flex items-center justify-center text-on-surface-variant text-sm">
+        세션 확인 중…
+      </div>
+    );
+  }
 
   if (view === 'landing') {
     return (
       <Landing
         onContinue={enterWorkspace}
+        onDevSkip={enterDevSkip}
         oauthConfigured={!!serverStatus?.oauthConfigured}
         busy={landingBusy || driveBusy}
+        error={authError}
       />
     );
   }
 
   return (
+    <>
     <AppShell
       activeTab={activeTab}
       onNavigate={setActiveTab}
       userEmail={driveEmail}
+      userName={userName}
+      userPicture={userPicture}
       walletHint={walletHint}
+      onWalletClick={() => {
+        setWalletError(null);
+        setWalletModalOpen(true);
+        void fetchWallets();
+      }}
       onLogout={logout}
+      paymentNetwork={serverStatus?.paymentNetwork}
+      onPaymentNetworkChange={switchPaymentNetwork}
+      paymentSwitchBusy={networkSwitchBusy}
     >
       {activeTab === 'studio' && (
         <StudioPage
@@ -512,11 +837,21 @@ export default function App() {
           creationResult={creationResult}
           onCreate={handleCreateAgent}
           driveEmail={driveEmail}
-          driveFolders={driveFolders}
+          primaryWalletAddress={primaryWallet?.address || null}
+          primaryWalletLabel={primaryWallet?.label || null}
+          driveItems={driveItems}
+          drivePath={drivePath}
           selectedFolderId={selectedFolderId}
+          selectedDriveName={selectedDriveName}
+          selectedDriveKind={selectedDriveKind}
           setSelectedFolderId={setSelectedFolderId}
           driveBusy={driveBusy}
+          driveError={driveError}
           onConnectDrive={connectGoogleDrive}
+          onRefreshDrive={refreshDriveFolders}
+          onNavigateDrive={navigateDriveFolder}
+          onNavigateDriveCrumb={navigateDriveCrumb}
+          onSelectDriveItem={selectDriveItem}
           tenantIdInput={tenantIdInput}
           setTenantIdInput={setTenantIdInput}
           activeAgent={activeAgent}
@@ -562,5 +897,16 @@ export default function App() {
         <SettlementsPage settlements={settlements} agents={agents} />
       )}
     </AppShell>
+    <WalletModal
+      open={walletModalOpen}
+      onClose={() => setWalletModalOpen(false)}
+      wallets={wallets}
+      busy={walletBusy}
+      error={walletError}
+      onAdd={addUserWallet}
+      onSetPrimary={setUserPrimaryWallet}
+      onRemove={removeUserWallet}
+    />
+    </>
   );
 }

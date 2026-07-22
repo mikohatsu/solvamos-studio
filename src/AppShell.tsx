@@ -18,9 +18,15 @@ type Props = {
   activeTab: AppTab;
   onNavigate: (tab: AppTab) => void;
   userEmail?: string | null;
+  userName?: string | null;
+  userPicture?: string | null;
   walletHint?: string | null;
+  onWalletClick?: () => void;
   children: ReactNode;
   onLogout?: () => void;
+  paymentNetwork?: string;
+  onPaymentNetworkChange?: (network: 'sandbox' | 'devnet') => void;
+  paymentSwitchBusy?: boolean;
 };
 
 const NAV: { id: AppTab; label: string; icon: typeof Bot }[] = [
@@ -33,9 +39,15 @@ export default function AppShell({
   activeTab,
   onNavigate,
   userEmail,
+  userName,
+  userPicture,
   walletHint,
+  onWalletClick,
   children,
   onLogout,
+  paymentNetwork,
+  onPaymentNetworkChange,
+  paymentSwitchBusy,
 }: Props) {
   return (
     <div className="bg-background text-on-surface antialiased min-h-screen flex font-sans overflow-x-hidden">
@@ -50,6 +62,44 @@ export default function AppShell({
               </p>
             </div>
           </div>
+          {onPaymentNetworkChange && (
+            <div className="mt-3 p-2 rounded-lg bg-surface-container border border-outline-variant/20">
+              <p className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider mb-2 px-1">
+                결제 테스트 모드
+              </p>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  disabled={paymentSwitchBusy}
+                  onClick={() => onPaymentNetworkChange('sandbox')}
+                  className={
+                    paymentNetwork === 'sandbox'
+                      ? 'flex-1 py-1.5 rounded-md text-xs font-semibold bg-solana-green/20 text-solana-green border border-solana-green/40'
+                      : 'flex-1 py-1.5 rounded-md text-xs font-medium text-on-surface-variant hover:bg-surface-container-highest'
+                  }
+                >
+                  Sandbox
+                </button>
+                <button
+                  type="button"
+                  disabled={paymentSwitchBusy}
+                  onClick={() => onPaymentNetworkChange('devnet')}
+                  className={
+                    paymentNetwork === 'devnet'
+                      ? 'flex-1 py-1.5 rounded-md text-xs font-semibold bg-google-blue/20 text-google-blue border border-google-blue/40'
+                      : 'flex-1 py-1.5 rounded-md text-xs font-medium text-on-surface-variant hover:bg-surface-container-highest'
+                  }
+                >
+                  Devnet
+                </button>
+              </div>
+              <p className="text-[10px] text-outline mt-2 px-1 leading-relaxed">
+                {paymentNetwork === 'devnet'
+                  ? '제품 경로: Devnet USDC 실서명 필요'
+                  : '테스트: pay.sh 샌드박스 증명'}
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col gap-1 flex-grow">
@@ -143,21 +193,51 @@ export default function AppShell({
               Workspace
             </button>
             {walletHint ? (
-              <div className="px-3 py-1.5 rounded-full bg-secondary-container/10 border border-secondary/30 text-secondary text-xs font-mono flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onWalletClick}
+                className="px-3 py-1.5 rounded-full bg-secondary-container/10 border border-secondary/30 text-secondary text-xs font-mono flex items-center gap-2 hover:bg-secondary-container/20 transition-colors"
+                title="지갑 관리"
+              >
                 <span className="h-2 w-2 rounded-full bg-solana-green" />
                 {walletHint}
-              </div>
+              </button>
             ) : (
               <button
                 type="button"
+                onClick={onWalletClick}
                 className="btn-primary px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2"
               >
                 <Wallet className="w-4 h-4" />
                 Connect Wallet
               </button>
             )}
-            <div className="w-8 h-8 rounded-full bg-surface-container-high overflow-hidden border border-outline-variant/20 ml-1" title={userEmail || undefined}>
-              <img src="/avatar.png" alt="" className="w-full h-full object-cover" />
+            <div className="flex items-center gap-2 ml-1">
+              {(userName || userEmail) && (
+                <div className="hidden sm:flex flex-col items-end mr-1">
+                  {userName && (
+                    <span className="text-xs font-medium text-on-surface leading-tight">
+                      {userName}
+                    </span>
+                  )}
+                  {userEmail && (
+                    <span className="text-[10px] text-on-surface-variant leading-tight">
+                      {userEmail}
+                    </span>
+                  )}
+                </div>
+              )}
+              <div
+                className="w-8 h-8 rounded-full bg-surface-container-high overflow-hidden border border-outline-variant/20"
+                title={userEmail || undefined}
+              >
+                <img
+                  src={userPicture || '/avatar.png'}
+                  alt=""
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
             </div>
           </div>
         </header>

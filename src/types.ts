@@ -22,10 +22,23 @@ export interface Agent {
   perCallPriceUsdc?: number;
 }
 
-export interface DriveFolder {
+export interface DriveItem {
   id: string;
   name: string;
+  mimeType?: string;
   parents?: string[];
+  modifiedTime?: string;
+  size?: string;
+  webViewLink?: string;
+  kind?: 'folder' | 'file';
+}
+
+/** @deprecated use DriveItem */
+export type DriveFolder = DriveItem;
+
+export interface DrivePathCrumb {
+  id: string;
+  name: string;
 }
 
 export interface Message {
@@ -37,6 +50,14 @@ export interface Message {
   paymentStatus?: 'none' | 'pending_proof' | 'verified' | 'failed';
   paymentTx?: string;
   details?: string;
+  a2aHops?: {
+    toName: string;
+    toAgentId: string;
+    feeUsdc: number;
+    paymentProof: string;
+    ok: boolean;
+    error?: string;
+  }[];
 }
 
 export interface PromptOptions {

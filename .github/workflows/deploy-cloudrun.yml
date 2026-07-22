@@ -21,7 +21,7 @@ env:
   AR_REPO: solvamos-img
   SERVICE: solvamos-studio
   TIER: starter
-  NODE_VERSION: "20"
+  NODE_VERSION: "24"
 
 jobs:
   # ── 1) 코드 리뷰 게이트 (타입체크 + 시크릿 파일 가드) ─────────────

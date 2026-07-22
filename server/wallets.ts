@@ -3,8 +3,8 @@
  */
 
 import fs from 'fs';
-import path from 'path';
 import { PublicKey } from '@solana/web3.js';
+import { dataFile, ensureDataDir } from './data-paths.js';
 
 export type UserWallet = {
   id: string;
@@ -17,7 +17,7 @@ export type UserWallet = {
 
 type WalletStore = Record<string, UserWallet[]>; // ownerKey → wallets
 
-const WALLETS_FILE = path.join(process.cwd(), '.data', 'user-wallets.json');
+const WALLETS_FILE = dataFile('user-wallets.json');
 
 let store: WalletStore = {};
 
@@ -34,7 +34,7 @@ export function loadWallets() {
 
 function save() {
   try {
-    fs.mkdirSync(path.dirname(WALLETS_FILE), { recursive: true });
+    ensureDataDir();
     fs.writeFileSync(WALLETS_FILE, JSON.stringify(store, null, 2), 'utf8');
   } catch (err) {
     console.warn('[wallets] save failed', err);

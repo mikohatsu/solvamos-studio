@@ -3,8 +3,8 @@
  */
 
 import fs from 'fs';
-import path from 'path';
 import { compileSystemPrompt } from './prompt.js';
+import { dataFile, ensureDataDir } from './data-paths.js';
 
 export interface AgentRecord {
   id: string;
@@ -27,7 +27,7 @@ export interface AgentRecord {
   perCallPriceUsdc?: number;
 }
 
-const AGENTS_FILE = path.join(process.cwd(), 'agents_db.json');
+const AGENTS_FILE = dataFile('agents_db.json');
 let agents: Record<string, AgentRecord> = {};
 
 export function loadAgents() {
@@ -99,7 +99,12 @@ function seedDefaultAgents() {
 }
 
 export function saveAgents() {
-  fs.writeFileSync(AGENTS_FILE, JSON.stringify(agents, null, 2), 'utf8');
+  try {
+    ensureDataDir();
+    fs.writeFileSync(AGENTS_FILE, JSON.stringify(agents, null, 2), 'utf8');
+  } catch (err) {
+    console.error('agents save failed', err);
+  }
 }
 
 export function listAgents(): AgentRecord[] {

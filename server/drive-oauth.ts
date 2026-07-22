@@ -7,13 +7,13 @@
 
 import crypto from 'crypto';
 import fs from 'fs';
-import path from 'path';
 import { google } from 'googleapis';
 import { GoogleAuth } from 'google-auth-library';
 import type { Request, Response, NextFunction } from 'express';
 import { config } from './config.js';
 import { getTenant, upsertTenant } from './tenants.js';
 import { provisionCustomerProject } from './provision.js';
+import { dataFile, ensureDataDir } from './data-paths.js';
 
 const SCOPES = [
   'openid',
@@ -24,7 +24,7 @@ const SCOPES = [
 
 const COOKIE_NAME = 'solvamos_sid';
 const ADC_SESSION_ID = 'adc_local';
-const SESSION_FILE = path.join(process.cwd(), '.data', 'oauth-sessions.json');
+const SESSION_FILE = dataFile('oauth-sessions.json');
 const STATE_TTL_MS = 15 * 60 * 1000;
 const SESSION_MAX_AGE_SEC = 30 * 24 * 3600;
 
@@ -60,7 +60,7 @@ function loadSessions() {
 
 function saveSessions() {
   try {
-    fs.mkdirSync(path.dirname(SESSION_FILE), { recursive: true });
+    ensureDataDir();
     fs.writeFileSync(SESSION_FILE, JSON.stringify(oauthSessions, null, 2));
   } catch (err) {
     console.warn('[oauth] failed to persist sessions', err);

@@ -8,9 +8,9 @@
  */
 
 import fs from 'fs';
-import path from 'path';
 import { config } from './config.js';
 import type { AgentRecord } from './agents-store.js';
+import { dataFile, ensureDataDir } from './data-paths.js';
 
 export type PayShCatalogEntry = {
   catalogId: string;
@@ -32,7 +32,7 @@ export type PayShCatalogEntry = {
   tags: string[];
 };
 
-const CATALOG_FILE = path.join(process.cwd(), '.data', 'paysh-catalog.json');
+const CATALOG_FILE = dataFile('paysh-catalog.json');
 
 let catalog: Record<string, PayShCatalogEntry> = {};
 
@@ -49,8 +49,12 @@ export function loadPayShCatalog() {
 }
 
 function saveCatalog() {
-  fs.mkdirSync(path.dirname(CATALOG_FILE), { recursive: true });
-  fs.writeFileSync(CATALOG_FILE, JSON.stringify(catalog, null, 2), 'utf8');
+  try {
+    ensureDataDir();
+    fs.writeFileSync(CATALOG_FILE, JSON.stringify(catalog, null, 2), 'utf8');
+  } catch (err) {
+    console.error('pay.sh catalog save failed', err);
+  }
 }
 
 export function listCatalog(opts?: { listedOnly?: boolean }): PayShCatalogEntry[] {

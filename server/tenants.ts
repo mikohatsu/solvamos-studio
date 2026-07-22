@@ -3,7 +3,7 @@
  */
 
 import fs from 'fs';
-import path from 'path';
+import { dataFile, ensureDataDir } from './data-paths.js';
 
 export type TenantRecord = {
   tenantId: string;
@@ -25,7 +25,7 @@ export type TenantRecord = {
   provisionNotes?: string[];
 };
 
-const TENANTS_FILE = path.join(process.cwd(), 'tenants_db.json');
+const TENANTS_FILE = dataFile('tenants_db.json');
 
 let tenants: Record<string, TenantRecord> = {};
 
@@ -40,7 +40,12 @@ export function loadTenants() {
 }
 
 function save() {
-  fs.writeFileSync(TENANTS_FILE, JSON.stringify(tenants, null, 2), 'utf8');
+  try {
+    ensureDataDir();
+    fs.writeFileSync(TENANTS_FILE, JSON.stringify(tenants, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Failed to save tenants_db.json', err);
+  }
 }
 
 export function listTenants(): TenantRecord[] {

@@ -251,6 +251,7 @@ jobs:
       - name: Deploy to Cloud Run
         run: |
           set -euo pipefail
+          # --update-env-vars: merge only (do NOT use --set-env-vars — it wipes OAuth/APP_URL)
           gcloud run deploy "${SERVICE}" \
             --project="${PROJECT_ID}" \
             --region="${REGION}" \
@@ -261,19 +262,52 @@ jobs:
             --cpu-boost \
             --min-instances="${{ steps.tier.outputs.min }}" \
             --max-instances=20 \
-            --set-env-vars="NODE_ENV=production,CUSTOMER_TIER=${TIER},ALLOW_LOCAL_VAULT_FALLBACK=false,ALLOW_PAYMENT_BYPASS=false,ALLOW_ADC_DRIVE=false,GOOGLE_CLOUD_PROJECT=${PROJECT_ID},PAYMENT_NETWORK=devnet"
+            --update-env-vars="NODE_ENV=production,CUSTOMER_TIER=${TIER},ALLOW_LOCAL_VAULT_FALLBACK=false,ALLOW_PAYMENT_BYPASS=false,ALLOW_ADC_DRIVE=false,GOOGLE_CLOUD_PROJECT=${PROJECT_ID},PAYMENT_NETWORK=devnet"
 
-      - name: Service URL
+      - name: Bind runtime URL + OAuth secrets (preserve across deploys)
+        env:
+          GOOGLE_CLIENT_ID_VAR: ${{ vars.GOOGLE_CLIENT_ID }}
         run: |
-          URL=$(gcloud run services describe "${SERVICE}" \
-            --project="${PROJECT_ID}" \
-            --region="${REGION}" \
-            --format='value(status.url)')
+          set -euo pipefail
+          PROJECT_NUMBER=$(gcloud projects describe "${PROJECT_ID}" --format='value(projectNumber)')
+          # Prefer regional URL (Console format)
+          URL="https://${SERVICE}-${PROJECT_NUMBER}.${REGION}.run.app"
+
+          UPDATE_ENV="APP_URL=${URL},OAUTH_REDIRECT_URI=${URL}/api/auth/google/callback"
+          if [ -n "${GOOGLE_CLIENT_ID_VAR}" ]; then
+            UPDATE_ENV="${UPDATE_ENV},GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID_VAR}"
+          fi
+
+          SECRET_FLAGS=()
+          if gcloud secrets describe google-client-secret --project="${PROJECT_ID}" >/dev/null 2>&1; then
+            SECRET_FLAGS+=("GOOGLE_CLIENT_SECRET=google-client-secret:latest")
+          fi
+          if gcloud secrets describe gemini-api-key --project="${PROJECT_ID}" >/dev/null 2>&1; then
+            SECRET_FLAGS+=("GEMINI_API_KEY=gemini-api-key:latest")
+          fi
+
+          ARGS=(
+            run services update "${SERVICE}"
+            --project="${PROJECT_ID}"
+            --region="${REGION}"
+            --update-env-vars="${UPDATE_ENV}"
+          )
+          if [ ${#SECRET_FLAGS[@]} -gt 0 ]; then
+            IFS=,
+            ARGS+=(--update-secrets="${SECRET_FLAGS[*]}")
+            unset IFS
+          fi
+          gcloud "${ARGS[@]}"
+
+          echo "URL=${URL}" >> "$GITHUB_ENV"
           {
             echo "### Deployed"
             echo "- **URL:** ${URL}"
-            echo "- **Health:** ${URL}/healthz"
+            echo "- **Health:** ${URL}/api/status"
             echo "- **Image:** \`${IMAGE_URI}\`"
-            echo "- **Next:** Secret Manager + APP_URL / OAuth redirect"
+            echo "- **OAuth env:** merged (APP_URL + Secret Manager re-bind if secrets exist)"
+            if [ -z "${GOOGLE_CLIENT_ID_VAR}" ]; then
+              echo "- **Note:** set repo Variable \`GOOGLE_CLIENT_ID\` so CI re-applies Client ID every deploy"
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
           echo "Deployed: ${URL}"

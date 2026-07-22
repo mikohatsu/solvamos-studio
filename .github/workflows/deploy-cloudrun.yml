@@ -131,11 +131,23 @@ jobs:
 
       - name: Apply optional repo Variables
         run: |
-          [ -n "${{ vars.GCP_PROJECT_ID }}" ] && echo "PROJECT_ID=${{ vars.GCP_PROJECT_ID }}" >> "$GITHUB_ENV"
-          [ -n "${{ vars.GCP_REGION }}" ] && echo "REGION=${{ vars.GCP_REGION }}" >> "$GITHUB_ENV"
-          [ -n "${{ vars.GCP_AR_REPO }}" ] && echo "AR_REPO=${{ vars.GCP_AR_REPO }}" >> "$GITHUB_ENV"
-          [ -n "${{ vars.GCP_SERVICE }}" ] && echo "SERVICE=${{ vars.GCP_SERVICE }}" >> "$GITHUB_ENV"
-          [ -n "${{ vars.GCP_TIER }}" ] && echo "TIER=${{ vars.GCP_TIER }}" >> "$GITHUB_ENV"
+          # empty vars must not fail the step (set -e + `&&` returns 1)
+          if [ -n "${{ vars.GCP_PROJECT_ID }}" ]; then
+            echo "PROJECT_ID=${{ vars.GCP_PROJECT_ID }}" >> "$GITHUB_ENV"
+          fi
+          if [ -n "${{ vars.GCP_REGION }}" ]; then
+            echo "REGION=${{ vars.GCP_REGION }}" >> "$GITHUB_ENV"
+          fi
+          if [ -n "${{ vars.GCP_AR_REPO }}" ]; then
+            echo "AR_REPO=${{ vars.GCP_AR_REPO }}" >> "$GITHUB_ENV"
+          fi
+          if [ -n "${{ vars.GCP_SERVICE }}" ]; then
+            echo "SERVICE=${{ vars.GCP_SERVICE }}" >> "$GITHUB_ENV"
+          fi
+          if [ -n "${{ vars.GCP_TIER }}" ]; then
+            echo "TIER=${{ vars.GCP_TIER }}" >> "$GITHUB_ENV"
+          fi
+          echo "Using PROJECT_ID=${PROJECT_ID} REGION=${REGION} SERVICE=${SERVICE}"
 
       - name: Short SHA
         id: meta

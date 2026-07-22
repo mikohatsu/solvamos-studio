@@ -1,0 +1,13 @@
+.node_modules
+.git
+.github
+.data
+*.md
+.env
+.env.*
+!.env.example
+agents_db.json
+tenants_db.json
+kms_vault_mock.json
+dist
+bun.lock

@@ -1,0 +1,215 @@
+# CI: 코드 리뷰(타입체크) → 빌드 테스트 → (main만) Cloud Run 배포
+# 인증: GitHub Variables WIF_PROVIDER + WIF_SERVICE_ACCOUNT (키 생성 불가 Org용)
+# 런북: SOLANA docs/CICD_CLOUDRUN.md
+
+name: CI / Deploy Cloud Run
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-deploy-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PROJECT_ID: project-64269e62-555d-4979-88e
+  REGION: asia-northeast3
+  AR_REPO: solvamos
+  SERVICE: solvamos-studio
+  TIER: starter
+  NODE_VERSION: "20"
+
+jobs:
+  # ── 1) 코드 리뷰 게이트 (타입체크 + 시크릿 파일 가드) ─────────────
+  review:
+    name: Review
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck (lint)
+        run: npm run lint
+
+      - name: Guard committed secrets
+        run: |
+          set -euo pipefail
+          bad=$(git ls-files | grep -E '(^|/)\.env$|\.pem$|credentials\.json$|github-deploy-key\.json$' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::Secret-like files must not be committed:"
+            echo "$bad"
+            exit 1
+          fi
+          echo "No secret-like tracked files."
+
+      - name: Review summary
+        run: |
+          {
+            echo "### Review"
+            echo "- Typecheck (\`tsc --noEmit\`): pass"
+            echo "- Secret file guard: pass"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ── 2) 빌드 테스트 (Vite + server 번들 + Docker 이미지) ──────────
+  build-test:
+    name: Build test
+    needs: [review]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Production build
+        run: npm run build
+
+      - name: Assert build artifacts
+        run: |
+          set -euo pipefail
+          test -f dist/server.cjs
+          test -d dist/client -o -d dist/assets -o -f dist/index.html \
+            || ls -la dist
+          echo "Artifacts OK:"
+          ls -la dist | head -40
+
+      - name: Docker build (no push)
+        run: |
+          set -euo pipefail
+          docker build -t solvamos-studio:ci-${{ github.sha }} .
+          echo "Docker image built locally (not pushed)."
+
+      - name: Build summary
+        run: |
+          {
+            echo "### Build test"
+            echo "- \`npm run build\`: pass"
+            echo "- Docker build: pass"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ── 3) 배포 (main push / 수동만 · review+build 성공 필수) ───────
+  deploy:
+    name: Deploy Cloud Run
+    needs: [review, build-test]
+    if: >
+      always() &&
+      needs.review.result == 'success' &&
+      needs.build-test.result == 'success' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Apply optional repo Variables
+        run: |
+          [ -n "${{ vars.GCP_PROJECT_ID }}" ] && echo "PROJECT_ID=${{ vars.GCP_PROJECT_ID }}" >> "$GITHUB_ENV"
+          [ -n "${{ vars.GCP_REGION }}" ] && echo "REGION=${{ vars.GCP_REGION }}" >> "$GITHUB_ENV"
+          [ -n "${{ vars.GCP_AR_REPO }}" ] && echo "AR_REPO=${{ vars.GCP_AR_REPO }}" >> "$GITHUB_ENV"
+          [ -n "${{ vars.GCP_SERVICE }}" ] && echo "SERVICE=${{ vars.GCP_SERVICE }}" >> "$GITHUB_ENV"
+          [ -n "${{ vars.GCP_TIER }}" ] && echo "TIER=${{ vars.GCP_TIER }}" >> "$GITHUB_ENV"
+
+      - name: Short SHA
+        id: meta
+        run: echo "sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Authenticate to Google Cloud (WIF)
+        if: ${{ vars.WIF_PROVIDER != '' && vars.WIF_SERVICE_ACCOUNT != '' }}
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+
+      - name: Authenticate to Google Cloud (SA key fallback)
+        if: ${{ vars.WIF_PROVIDER == '' || vars.WIF_SERVICE_ACCOUNT == '' }}
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Artifact Registry Docker auth
+        run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+
+      - name: Build and push image
+        env:
+          IMAGE: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPO }}/studio
+          SHA: ${{ steps.meta.outputs.sha }}
+        run: |
+          set -euo pipefail
+          docker build \
+            -t "${IMAGE}:${SHA}" \
+            -t "${IMAGE}:latest" \
+            .
+          docker push "${IMAGE}:${SHA}"
+          docker push "${IMAGE}:latest"
+          echo "IMAGE_URI=${IMAGE}:${SHA}" >> "$GITHUB_ENV"
+
+      - name: Resolve min instances
+        id: tier
+        run: |
+          MIN=0
+          case "${TIER}" in
+            professional) MIN=1 ;;
+            enterprise) MIN=2 ;;
+          esac
+          echo "min=${MIN}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to Cloud Run
+        run: |
+          set -euo pipefail
+          gcloud run deploy "${SERVICE}" \
+            --project="${PROJECT_ID}" \
+            --region="${REGION}" \
+            --platform=managed \
+            --image="${IMAGE_URI}" \
+            --port=8080 \
+            --allow-unauthenticated \
+            --cpu-boost \
+            --min-instances="${{ steps.tier.outputs.min }}" \
+            --max-instances=20 \
+            --set-env-vars="NODE_ENV=production,CUSTOMER_TIER=${TIER},ALLOW_LOCAL_VAULT_FALLBACK=false,ALLOW_PAYMENT_BYPASS=false,ALLOW_ADC_DRIVE=false,GOOGLE_CLOUD_PROJECT=${PROJECT_ID},PAYMENT_NETWORK=devnet"
+
+      - name: Service URL
+        run: |
+          URL=$(gcloud run services describe "${SERVICE}" \
+            --project="${PROJECT_ID}" \
+            --region="${REGION}" \
+            --format='value(status.url)')
+          {
+            echo "### Deployed"
+            echo "- **URL:** ${URL}"
+            echo "- **Health:** ${URL}/healthz"
+            echo "- **Image:** \`${IMAGE_URI}\`"
+            echo "- **Next:** Secret Manager + APP_URL / OAuth redirect"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Deployed: ${URL}"

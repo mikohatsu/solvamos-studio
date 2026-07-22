@@ -6,8 +6,8 @@
 
 고객 **Google Workspace Drive** 문서를 Sovereign RAG로 연결하며, 고객은 GCP를 몰라도 됩니다. SolVamos Org가 고객 전용 GCP 프로젝트를 대행 운영합니다.
 
-관련 문서: [`docs/concept.md`](../docs/concept.md) · [`docs/plan.md`](../docs/plan.md) · [`docs/progress.md`](../docs/progress.md) · [`docs/GCP_SETUP.md`](../docs/GCP_SETUP.md)  
-배포: [`solvamos-cloudrun`](../solvamos-cloudrun) · IaC: [`infra/terraform`](../infra/terraform)
+관련 문서: [`docs/concept.md`](../docs/concept.md) · [`docs/plan.md`](../docs/plan.md) · [`docs/progress.md`](../docs/progress.md) · [`docs/GCP_SETUP.md`](../docs/GCP_SETUP.md) · [`docs/CICD_CLOUDRUN.md`](../docs/CICD_CLOUDRUN.md)  
+배포: **`main` 머지 → GitHub Actions → Cloud Run** · 비상 [`solvamos-cloudrun`](../solvamos-cloudrun) · IaC: [`infra/terraform`](../infra/terraform)
 
 ---
 

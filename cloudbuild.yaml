@@ -1,0 +1,59 @@
+# 비상·수동: gcloud builds submit --config=cloudbuild.yaml
+# 자동 배포 1순위: .github/workflows/deploy-cloudrun.yml (main push)
+substitutions:
+  _REGION: asia-northeast3
+  _REPO: solvamos
+  _SERVICE: solvamos-studio
+  _TIER: starter
+  _MIN_INSTANCES: "0"
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    id: build
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/studio:$SHORT_SHA
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/studio:latest
+      - .
+
+  - name: gcr.io/cloud-builders/docker
+    id: push-sha
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/studio:$SHORT_SHA
+
+  - name: gcr.io/cloud-builders/docker
+    id: push-latest
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/studio:latest
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    id: deploy
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        MIN=${_MIN_INSTANCES}
+        if [ "${_TIER}" = "professional" ]; then MIN=1; fi
+        if [ "${_TIER}" = "enterprise" ]; then MIN=2; fi
+        gcloud run deploy ${_SERVICE} \
+          --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/studio:$SHORT_SHA \
+          --region=${_REGION} \
+          --platform=managed \
+          --allow-unauthenticated \
+          --port=8080 \
+          --cpu-boost \
+          --min-instances=$$MIN \
+          --max-instances=20 \
+          --set-env-vars=NODE_ENV=production,CUSTOMER_TIER=${_TIER},ALLOW_LOCAL_VAULT_FALLBACK=false,ALLOW_PAYMENT_BYPASS=false,ALLOW_ADC_DRIVE=false,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,PAYMENT_NETWORK=devnet \
+          --project=$PROJECT_ID
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/studio:$SHORT_SHA
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/studio:latest
+
+options:
+  logging: CLOUD_LOGGING_ONLY

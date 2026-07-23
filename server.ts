@@ -1137,6 +1137,8 @@ app.post('/api/agents/:id/invoke', async (req, res) => {
 });
 
 async function startServer() {
+  const degraded = process.env.BOOT_ALLOW_DEGRADED === 'true';
+
   // Bind PORT first — Cloud Run probes :8080 before DB warm completes.
   await new Promise<void>((resolve, reject) => {
     const server = app.listen(config.port, '0.0.0.0', () => {
@@ -1146,33 +1148,8 @@ async function startServer() {
     server.on('error', reject);
   });
 
-  if (process.env.DATABASE_URL) {
-    try {
-      await connectDb();
-    } catch (err: any) {
-      console.error('[db] connect failed', err?.message || err);
-      if (config.isProd && process.env.BOOT_ALLOW_DEGRADED !== 'true') {
-        console.error('[boot] DATABASE_URL unreachable in production — exiting');
-        process.exit(1);
-      }
-    }
-  } else {
-    console.warn('[db] DATABASE_URL unset — JWT refresh works, but Google tokens won’t survive restarts');
-    if (config.isProd && process.env.BOOT_ALLOW_DEGRADED !== 'true') {
-      console.error('[boot] DATABASE_URL required in production — exiting');
-      process.exit(1);
-    }
-  }
-
-  await loadTenants();
-  await ensureSharedCustomerTenant();
-  await loadAgents();
-  for (const a of await listAgents()) {
-    if (a.status !== 'PAUSED') {
-      void registerAgentOnPayShCatalog(a);
-    }
-  }
-
+  // Static UI after listen is fine — Express can add middleware late for unmatched routes,
+  // but register early so first HTML requests work once DB warm finishes.
   if (config.nodeEnv !== 'production') {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
@@ -1184,8 +1161,53 @@ async function startServer() {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
+      if (req.path.startsWith('/api') || req.path === '/healthz' || req.path === '/readyz') {
+        return res.status(404).json({ status: 'error', message: 'Not found' });
+      }
       res.sendFile(path.join(distPath, 'index.html'));
     });
+  }
+
+  let dbReady = false;
+  if (process.env.DATABASE_URL) {
+    try {
+      await connectDb();
+      dbReady = true;
+    } catch (err: any) {
+      console.error('[db] connect failed', err?.message || err);
+      if (config.isProd && !degraded) {
+        console.error('[boot] DATABASE_URL unreachable in production — exiting');
+        process.exit(1);
+      }
+      console.warn('[boot] continuing without DB (degraded or non-prod)');
+    }
+  } else {
+    console.warn('[db] DATABASE_URL unset — JWT refresh works, but Google tokens won’t survive restarts');
+    if (config.isProd && !degraded) {
+      console.error('[boot] DATABASE_URL required in production — exiting');
+      process.exit(1);
+    }
+  }
+
+  if (!dbReady) {
+    console.warn('[boot] skipping tenant/agent catalog warm — database not ready');
+    return;
+  }
+
+  try {
+    await loadTenants();
+    await ensureSharedCustomerTenant();
+    await loadAgents();
+    for (const a of await listAgents()) {
+      if (a.status !== 'PAUSED') {
+        void registerAgentOnPayShCatalog(a);
+      }
+    }
+  } catch (err: any) {
+    console.error('[boot] catalog warm failed', err?.message || err);
+    if (config.isProd && !degraded) {
+      process.exit(1);
+    }
   }
 }
 

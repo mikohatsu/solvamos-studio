@@ -72,6 +72,20 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: solvamos_studio
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d solvamos_studio"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -99,15 +113,58 @@ jobs:
           ls -la dist | head -40
           ls -la node_modules/.prisma/client | head -20
 
-      - name: Docker build + boot smoke (PORT probe)
+      - name: Migrate CI Postgres
+        env:
+          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/solvamos_studio?schema=public
+        run: npx prisma migrate deploy
+
+      - name: Docker build + boot smoke (PORT + real DB)
+        env:
+          DATABASE_URL: postgresql://ci:ci@host.docker.internal:5432/solvamos_studio?schema=public
         run: |
           set -euo pipefail
           IMAGE=solvamos-studio:ci-${{ github.sha }}
           docker build -t "${IMAGE}" .
-          # Minimal prod env so assertProductionSafety + prisma engines load.
-          # DB URL is a dummy — listen happens before connect; connect will fail and exit 1
-          # after PORT is already bound. Probe only needs TCP accept within a few seconds.
+
+          # Path A — production-like: real Postgres via host.docker.internal
           CID=$(docker run -d \
+            --add-host=host.docker.internal:host-gateway \
+            -e PORT=8080 \
+            -e NODE_ENV=production \
+            -e JWT_SECRET='ci-smoke-jwt-secret-at-least-32-chars!!' \
+            -e DATABASE_URL="${DATABASE_URL}" \
+            -e GOOGLE_CLOUD_PROJECT='ci-project' \
+            -e ALLOW_LOCAL_VAULT_FALLBACK=false \
+            -e ALLOW_PAYMENT_BYPASS=false \
+            -e PAYMENT_NETWORK=devnet \
+            -p 18080:8080 \
+            "${IMAGE}")
+          cleanup() { docker logs "${CID}" || true; docker rm -f "${CID}" >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+
+          ok=0
+          for i in $(seq 1 45); do
+            if curl -fsS "http://127.0.0.1:18080/healthz" >/dev/null; then
+              ok=1
+              break
+            fi
+            # If container already exited, fail fast with logs
+            if [ "$(docker inspect -f '{{.State.Running}}' "${CID}" 2>/dev/null || echo false)" != "true" ]; then
+              echo "::error::Container exited before /healthz succeeded"
+              exit 1
+            fi
+            sleep 1
+          done
+          if [ "${ok}" != "1" ]; then
+            echo "::error::Container never answered /healthz on :8080 — see docker logs above"
+            exit 1
+          fi
+          echo "Docker boot smoke OK (/healthz + Postgres)"
+
+          # Path B — engines-only degraded smoke (dummy DB) must still listen
+          docker rm -f "${CID}" >/dev/null 2>&1 || true
+          trap - EXIT
+          CID2=$(docker run -d \
             -e PORT=8080 \
             -e NODE_ENV=production \
             -e JWT_SECRET='ci-smoke-jwt-secret-at-least-32-chars!!' \
@@ -117,30 +174,34 @@ jobs:
             -e ALLOW_PAYMENT_BYPASS=false \
             -e PAYMENT_NETWORK=devnet \
             -e BOOT_ALLOW_DEGRADED=true \
-            -p 18080:8080 \
+            -p 18081:8080 \
             "${IMAGE}")
-          cleanup() { docker logs "${CID}" || true; docker rm -f "${CID}" >/dev/null 2>&1 || true; }
-          trap cleanup EXIT
-          ok=0
+          cleanup2() { docker logs "${CID2}" || true; docker rm -f "${CID2}" >/dev/null 2>&1 || true; }
+          trap cleanup2 EXIT
+          ok2=0
           for i in $(seq 1 30); do
-            if curl -fsS "http://127.0.0.1:18080/healthz" >/dev/null; then
-              ok=1
+            if curl -fsS "http://127.0.0.1:18081/healthz" >/dev/null; then
+              ok2=1
               break
+            fi
+            if [ "$(docker inspect -f '{{.State.Running}}' "${CID2}" 2>/dev/null || echo false)" != "true" ]; then
+              echo "::error::Degraded smoke container exited before /healthz"
+              exit 1
             fi
             sleep 1
           done
-          if [ "${ok}" != "1" ]; then
-            echo "::error::Container never answered /healthz on :8080 — see docker logs above"
+          if [ "${ok2}" != "1" ]; then
+            echo "::error::Degraded smoke never answered /healthz"
             exit 1
           fi
-          echo "Docker boot smoke OK (/healthz)"
+          echo "Docker degraded smoke OK (/healthz without DB)"
 
       - name: Build summary
         run: |
           {
             echo "### Build test"
             echo "- \`npm run build\` + prisma generate: pass"
-            echo "- Docker build + /healthz smoke: pass"
+            echo "- Docker boot smoke (Postgres + degraded): pass"
           } >> "$GITHUB_STEP_SUMMARY"
 
   # ── 3) 배포 (main push / 수동만 · review+build 성공 필수) ───────

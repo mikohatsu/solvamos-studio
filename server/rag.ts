@@ -6,6 +6,7 @@
 import { retrieveFromLocalCorpus, loadLocalRagCorpus } from './drive-ingest.js';
 import {
   createVertexSearchDataStore,
+  createAiApplicationBundle,
   importCorpusToVertexDataStore,
 } from './vertex-search.js';
 import { generateAnswer } from './vertex-generate.js';
@@ -144,6 +145,18 @@ export async function ensureDriveDataStore(opts: {
   engineId?: string;
 }> {
   return createVertexSearchDataStore(opts);
+}
+
+/** Create AI Applications app + data store for any source type (Drive optional). */
+export async function ensureAiApplication(opts: {
+  displayName: string;
+  appType?: string;
+  dataSourceType?: string;
+  driveFolderId?: string;
+  websiteUri?: string;
+  gcsUri?: string;
+}) {
+  return createAiApplicationBundle(opts);
 }
 
 export async function syncLocalCorpusToVertex(

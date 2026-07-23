@@ -17,11 +17,46 @@ export interface Agent {
   invokeCount: number;
   googleDriveFolderId?: string;
   vertexDataStoreId?: string;
+  vertexEngineId?: string;
+  aiAppType?: string;
+  dataSourceType?: string;
+  websiteUri?: string;
+  gcsUri?: string;
   secretManagerPath?: string;
   status?: string;
   fee?: number;
   perCallPriceUsdc?: number;
 }
+
+export interface PromptOptions {
+  role: 'support' | 'academic' | 'weather' | 'custom';
+  customRole?: string;
+  tone: 'casual' | 'professional' | 'academic' | 'cyberpunk';
+  securityLevel: 'strict' | 'balanced' | 'permissive';
+  /** Per-call USDC fee; 0 = free */
+  fee?: number;
+  /** AI Applications app kind */
+  aiAppType?: 'search_docs' | 'chat_rag' | 'website' | 'structured' | 'media';
+  /** Knowledge source for the app datastore */
+  dataSourceType?:
+    | 'none'
+    | 'local_upload'
+    | 'google_drive'
+    | 'website_url'
+    | 'cloud_storage'
+    | 'api_import'
+    | 'vertex_studio';
+  websiteUri?: string;
+  gcsUri?: string;
+}
+
+/** Files prepared client-side for RAG ingest (no GCP console). */
+export type LocalUploadFile = {
+  name: string;
+  mimeType?: string;
+  text?: string;
+  contentBase64?: string;
+};
 
 export interface DriveItem {
   id: string;
@@ -59,15 +94,6 @@ export interface Message {
     ok: boolean;
     error?: string;
   }[];
-}
-
-export interface PromptOptions {
-  role: 'support' | 'academic' | 'weather' | 'custom';
-  customRole?: string;
-  tone: 'professional' | 'casual' | 'academic' | 'cyberpunk';
-  securityLevel: 'strict' | 'balanced' | 'permissive';
-  /** Per-call USDC fee; 0 = free */
-  fee?: number;
 }
 
 export interface Settlement {

@@ -26,10 +26,23 @@ Agent 1──* RagDocument
 | `User` | Google SSO identity |
 | `Session` | cookie → tokens |
 | `Tenant` | customer / lab + GCP project |
-| `Agent` | built agent + `vertexDataStoreId` |
+| `Agent` | built agent + AI Applications ids (`vertexDataStoreId`, `vertexEngineId`, `aiAppType`, `dataSourceType`, …) |
 | `Wallet` | Solana addresses |
 | `CatalogListing` | pay.sh / A2A |
-| `RagDocument` | Drive text in DB |
+| `RagDocument` | ingested text stubs (Drive/local); PDF base64는 파일 코퍼스에만 |
+
+### Agent columns (RAG / AI Applications)
+
+| Column | Notes |
+|--------|--------|
+| `vertexDataStoreId` | Discovery Engine data store id |
+| `vertexEngineId` | AI Applications app/engine id |
+| `aiAppType` | `search_docs` \| `chat_rag` \| `website` \| `structured` \| `media` |
+| `dataSourceType` | `local_upload` \| `google_drive` \| `website_url` \| `none` \| … |
+| `websiteUri` / `gcsUri` | optional source metadata |
+| `googleDriveFolderId` | Drive source id when used |
+
+See [`docs/AI_APPLICATIONS_RAG.md`](../../docs/AI_APPLICATIONS_RAG.md).
 
 ## Instance (Lab)
 

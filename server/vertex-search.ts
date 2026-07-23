@@ -1,8 +1,15 @@
 /**
- * Vertex AI Search (Discovery Engine) — create data store + optional search engine + import docs.
+ * Vertex AI Search / AI Applications (Discovery Engine) —
+ * create data store + engine (app) for a chosen app type, then optional import.
  */
 import { GoogleAuth } from 'google-auth-library';
 import type { LocalRagCorpus } from './drive-ingest.js';
+import {
+  getAiAppType,
+  getDataSourceType,
+  type AiAppType,
+  type DataSourceType,
+} from './ai-applications.js';
 
 function projectId(): string | undefined {
   return process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT;
@@ -81,14 +88,14 @@ async function waitOperation(opName: string, timeoutMs = 180_000): Promise<any> 
   throw new Error(`Timed out waiting for operation ${opName}`);
 }
 
-function sanitizeDataStoreId(displayName: string, driveFolderId: string): string {
+function sanitizeId(displayName: string, hint: string): string {
   const safe = displayName
     .toLowerCase()
     .replace(/[^a-z0-9-]/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '')
-    .slice(0, 20);
-  const suffix = driveFolderId.replace(/[^a-z0-9]/gi, '').slice(0, 8).toLowerCase() || 'drv';
+    .slice(0, 18);
+  const suffix = (hint || 'app').replace(/[^a-z0-9]/gi, '').slice(0, 8).toLowerCase() || 'app';
   const id = `sv-${safe || 'agent'}-${suffix}-${Date.now().toString(36)}`;
   return id.slice(0, 63);
 }
@@ -100,23 +107,36 @@ export async function getDataStore(dataStoreId: string): Promise<boolean> {
   return res.ok;
 }
 
-/** Create Search App (engine) bound to data store — improves servingConfigs. */
-async function ensureSearchEngine(dataStoreId: string, displayName: string): Promise<string | null> {
+async function ensureEngine(opts: {
+  dataStoreId: string;
+  displayName: string;
+  appType: AiAppType;
+}): Promise<string | null> {
   const parent = parentCollection();
   if (!parent) return null;
-  const engineId = `${dataStoreId}-eng`.slice(0, 63);
+  const meta = getAiAppType(opts.appType);
+  const engineId = `${opts.dataStoreId}-eng`.slice(0, 63);
 
   const get = await gcpFetch(`${parent}/engines/${engineId}`);
   if (get.ok) return engineId;
 
-  const body = {
-    displayName: `${displayName} Search`.slice(0, 128),
-    solutionType: 'SOLUTION_TYPE_SEARCH',
-    dataStoreIds: [dataStoreId],
-    searchEngineConfig: {
-      searchTier: 'SEARCH_TIER_STANDARD',
-    },
+  const body: Record<string, unknown> = {
+    displayName: `${opts.displayName} (${meta.label})`.slice(0, 128),
+    solutionType: meta.solutionType,
+    dataStoreIds: [opts.dataStoreId],
   };
+
+  if (meta.solutionType === 'SOLUTION_TYPE_SEARCH') {
+    body.searchEngineConfig = { searchTier: 'SEARCH_TIER_STANDARD' };
+  } else {
+    body.chatEngineConfig = {
+      agentCreationConfig: {
+        business: opts.displayName.slice(0, 60) || 'SolVamos Agent',
+        defaultLanguageCode: 'ko',
+        timeZone: 'Asia/Seoul',
+      },
+    };
+  }
 
   const res = await gcpFetch(`${parent}/engines?engineId=${encodeURIComponent(engineId)}`, {
     method: 'POST',
@@ -132,24 +152,63 @@ async function ensureSearchEngine(dataStoreId: string, displayName: string): Pro
     return engineId;
   }
   if (res.status === 409) return engineId;
-  console.warn('[vertex-search] engine create', res.status, JSON.stringify(json).slice(0, 300));
+  console.warn('[vertex-search] engine create', res.status, JSON.stringify(json).slice(0, 400));
   return null;
 }
 
-export async function createVertexSearchDataStore(opts: {
-  displayName: string;
-  driveFolderId: string;
-}): Promise<{
+async function registerWebsiteTarget(dataStoreId: string, websiteUri: string): Promise<string> {
+  const parent = parentCollection();
+  if (!parent) return 'no parent';
+  const uri = websiteUri.startsWith('http') ? websiteUri : `https://${websiteUri}`;
+  const url = `${parent}/dataStores/${dataStoreId}/siteSearchEngine/targetSites`;
+  const res = await gcpFetch(url, {
+    method: 'POST',
+    body: JSON.stringify({
+      providedUriPattern: uri.replace(/^https?:\/\//, '').replace(/\/$/, '') + '*',
+      type: 'INCLUDE',
+    }),
+  });
+  const json: any = await res.json().catch(() => ({}));
+  if (res.ok || res.status === 409) {
+    if (json.name?.includes('/operations/')) {
+      await waitOperation(json.name).catch(() => null);
+    }
+    return `Registered site pattern for ${uri}`;
+  }
+  return `Site register ${res.status}: ${JSON.stringify(json).slice(0, 200)}`;
+}
+
+export type AiApplicationCreateResult = {
   dataStoreId: string;
+  engineId?: string;
+  appType: AiAppType;
+  dataSourceType: DataSourceType;
   status: 'created' | 'existing' | 'pending' | 'error';
   message?: string;
   operation?: string;
-  engineId?: string;
-}> {
+  sourceNote?: string;
+};
+
+/** Always create AI Applications data store + app(engine) for the chosen types. */
+export async function createAiApplicationBundle(opts: {
+  displayName: string;
+  appType?: string;
+  dataSourceType?: string;
+  driveFolderId?: string;
+  websiteUri?: string;
+  gcsUri?: string;
+}): Promise<AiApplicationCreateResult> {
+  const appMeta = getAiAppType(opts.appType);
+  const sourceMeta = getDataSourceType(opts.dataSourceType);
   const project = projectId();
+  const hint =
+    opts.driveFolderId || opts.websiteUri || opts.gcsUri || appMeta.id || 'app';
+
   if (!project) {
     return {
-      dataStoreId: sanitizeDataStoreId(opts.displayName, opts.driveFolderId),
+      dataStoreId: sanitizeId(opts.displayName, hint),
+      appType: appMeta.id,
+      dataSourceType: sourceMeta.id,
       status: 'error',
       message: 'GOOGLE_CLOUD_PROJECT not set',
     };
@@ -163,6 +222,8 @@ export async function createVertexSearchDataStore(opts: {
     const exists = await getDataStore(configured).catch(() => false);
     return {
       dataStoreId: configured,
+      appType: appMeta.id,
+      dataSourceType: sourceMeta.id,
       status: exists ? 'existing' : 'pending',
       message: exists
         ? `Lab shared VERTEX_DATA_STORE_ID=${configured}`
@@ -172,34 +233,42 @@ export async function createVertexSearchDataStore(opts: {
 
   const tokenOk = await getGcpAccessToken();
   if (!tokenOk) {
-    const id = sanitizeDataStoreId(opts.displayName, opts.driveFolderId);
     return {
-      dataStoreId: id,
+      dataStoreId: sanitizeId(opts.displayName, hint),
+      appType: appMeta.id,
+      dataSourceType: sourceMeta.id,
       status: 'error',
       message:
-        'ADC missing — cannot create Discovery Engine data store. `gcloud auth application-default login`',
+        'ADC missing — cannot create AI Applications resources. `gcloud auth application-default login`',
     };
   }
 
-  const dataStoreId = sanitizeDataStoreId(opts.displayName, opts.driveFolderId);
+  const dataStoreId = sanitizeId(opts.displayName, hint);
   const parent = parentCollection()!;
 
   if (await getDataStore(dataStoreId).catch(() => false)) {
-    const engineId = (await ensureSearchEngine(dataStoreId, opts.displayName)) || undefined;
+    const engineId =
+      (await ensureEngine({
+        dataStoreId,
+        displayName: opts.displayName,
+        appType: appMeta.id,
+      })) || undefined;
     return {
       dataStoreId,
-      status: 'existing',
-      message: 'Data store already exists',
       engineId,
+      appType: appMeta.id,
+      dataSourceType: sourceMeta.id,
+      status: 'existing',
+      message: 'Data store already exists; ensured engine/app',
     };
   }
 
   const createUrl = `${parent}/dataStores?dataStoreId=${encodeURIComponent(dataStoreId)}`;
   const body = {
-    displayName: opts.displayName.slice(0, 128) || dataStoreId,
-    industryVertical: 'GENERIC',
-    solutionTypes: ['SOLUTION_TYPE_SEARCH'],
-    contentConfig: 'CONTENT_REQUIRED',
+    displayName: `${opts.displayName}`.slice(0, 128) || dataStoreId,
+    industryVertical: appMeta.industryVertical,
+    solutionTypes: [appMeta.solutionType],
+    contentConfig: appMeta.contentConfig,
   };
 
   const res = await gcpFetch(createUrl, {
@@ -210,11 +279,25 @@ export async function createVertexSearchDataStore(opts: {
 
   if (!res.ok) {
     if (res.status === 409 || /already exists/i.test(JSON.stringify(json))) {
-      const engineId = (await ensureSearchEngine(dataStoreId, opts.displayName)) || undefined;
-      return { dataStoreId, status: 'existing', message: 'Data store already exists', engineId };
+      const engineId =
+        (await ensureEngine({
+          dataStoreId,
+          displayName: opts.displayName,
+          appType: appMeta.id,
+        })) || undefined;
+      return {
+        dataStoreId,
+        engineId,
+        appType: appMeta.id,
+        dataSourceType: sourceMeta.id,
+        status: 'existing',
+        message: 'Data store already exists',
+      };
     }
     return {
       dataStoreId,
+      appType: appMeta.id,
+      dataSourceType: sourceMeta.id,
       status: 'error',
       message: `Create data store failed (${res.status}): ${JSON.stringify(json).slice(0, 400)}. Enable discoveryengine.googleapis.com.`,
     };
@@ -226,6 +309,8 @@ export async function createVertexSearchDataStore(opts: {
     } catch (err: any) {
       return {
         dataStoreId,
+        appType: appMeta.id,
+        dataSourceType: sourceMeta.id,
         status: 'pending',
         message: `Create started but wait failed: ${err.message}`,
         operation: json.name,
@@ -233,20 +318,64 @@ export async function createVertexSearchDataStore(opts: {
     }
   }
 
-  const engineId = (await ensureSearchEngine(dataStoreId, opts.displayName)) || undefined;
+  const engineId =
+    (await ensureEngine({
+      dataStoreId,
+      displayName: opts.displayName,
+      appType: appMeta.id,
+    })) || undefined;
+
+  let sourceNote: string | undefined;
+  if (sourceMeta.id === 'website_url' && opts.websiteUri && appMeta.contentConfig === 'PUBLIC_WEBSITE') {
+    sourceNote = await registerWebsiteTarget(dataStoreId, opts.websiteUri);
+  } else if (sourceMeta.id === 'cloud_storage' && opts.gcsUri) {
+    sourceNote = `GCS URI saved for connector/console: ${opts.gcsUri}`;
+  } else if (sourceMeta.id === 'local_upload') {
+    sourceNote = 'Local uploads ingest after store create (customer files → corpus → Vertex)';
+  } else if (sourceMeta.emptyThenConfigure) {
+    sourceNote = `${sourceMeta.label}: empty store ready — platform ingest (not customer console)`;
+  } else if (sourceMeta.id === 'google_drive') {
+    sourceNote = 'Google Drive ingest runs after store create (if folder selected)';
+  }
+
   return {
     dataStoreId,
-    status: 'created',
-    message: `Created Vertex AI Search data store ${dataStoreId} in ${project}`,
-    operation: json.name,
     engineId,
+    appType: appMeta.id,
+    dataSourceType: sourceMeta.id,
+    status: 'created',
+    message: `Created AI Applications data store ${dataStoreId} + app/engine ${engineId || '(pending)'} (${appMeta.label}) in ${location()}`,
+    operation: json.name,
+    sourceNote,
   };
 }
 
-/**
- * Import local Drive-ingest corpus into Discovery Engine as inline documents.
- * Uses importDocuments batch when possible, else per-doc create.
- */
+/** @deprecated use createAiApplicationBundle */
+export async function createVertexSearchDataStore(opts: {
+  displayName: string;
+  driveFolderId: string;
+}): Promise<{
+  dataStoreId: string;
+  status: 'created' | 'existing' | 'pending' | 'error';
+  message?: string;
+  operation?: string;
+  engineId?: string;
+}> {
+  const r = await createAiApplicationBundle({
+    displayName: opts.displayName,
+    driveFolderId: opts.driveFolderId,
+    appType: 'search_docs',
+    dataSourceType: opts.driveFolderId ? 'google_drive' : 'none',
+  });
+  return {
+    dataStoreId: r.dataStoreId,
+    status: r.status,
+    message: r.message,
+    operation: r.operation,
+    engineId: r.engineId,
+  };
+}
+
 export async function importCorpusToVertexDataStore(
   dataStoreId: string,
   corpus: LocalRagCorpus
@@ -259,25 +388,37 @@ export async function importCorpusToVertexDataStore(
 
   const branch = `${parent}/dataStores/${dataStoreId}/branches/default_branch`;
 
-  // Batch import
+  const toInlineDoc = (doc: LocalRagCorpus['docs'][number]) => {
+    const documentId =
+      doc.id.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 63) || `doc_${doc.id.slice(0, 8)}`;
+    const isPdf =
+      doc.mimeType === 'application/pdf' || doc.name.toLowerCase().endsWith('.pdf');
+    const mimeType =
+      isPdf && doc.contentBase64
+        ? 'application/pdf'
+        : doc.mimeType?.startsWith('text/') || doc.mimeType === 'application/json'
+          ? doc.mimeType || 'text/plain'
+          : 'text/plain';
+    const rawBytes = doc.contentBase64
+      ? doc.contentBase64
+      : Buffer.from(doc.text || '', 'utf8').toString('base64');
+    return {
+      id: documentId,
+      structData: {
+        title: doc.name,
+        link: doc.webViewLink || '',
+        source: isPdf ? 'pdf' : 'text',
+        driveFileId: doc.id,
+      },
+      content: {
+        mimeType,
+        rawBytes,
+      },
+    };
+  };
+
   const inlineSource = {
-    documents: corpus.docs.slice(0, 40).map((doc) => {
-      const documentId = doc.id.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 63) || `doc_${doc.id.slice(0, 8)}`;
-      const rawBytes = Buffer.from(doc.text, 'utf8').toString('base64');
-      return {
-        id: documentId,
-        structData: {
-          title: doc.name,
-          link: doc.webViewLink || '',
-          source: 'google_drive',
-          driveFileId: doc.id,
-        },
-        content: {
-          mimeType: 'text/plain',
-          rawBytes,
-        },
-      };
-    }),
+    documents: corpus.docs.slice(0, 40).map(toInlineDoc),
   };
 
   try {
@@ -310,22 +451,8 @@ export async function importCorpusToVertexDataStore(
   let imported = 0;
   const errors: string[] = [];
   for (const doc of corpus.docs.slice(0, 40)) {
-    const documentId = doc.id.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 63) || `doc_${imported}`;
-    const rawBytes = Buffer.from(doc.text, 'utf8').toString('base64');
-    const payload = {
-      id: documentId,
-      structData: {
-        title: doc.name,
-        link: doc.webViewLink || '',
-        source: 'google_drive',
-        driveFileId: doc.id,
-      },
-      content: {
-        mimeType: 'text/plain',
-        rawBytes,
-      },
-    };
-
+    const payload = toInlineDoc(doc);
+    const documentId = payload.id;
     const res = await gcpFetch(
       `${branch}/documents?documentId=${encodeURIComponent(documentId)}`,
       { method: 'POST', body: JSON.stringify(payload) }

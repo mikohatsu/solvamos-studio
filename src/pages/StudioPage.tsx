@@ -13,8 +13,52 @@ import {
   RefreshCw,
   Lock,
 } from 'lucide-react';
-import { Agent, DriveItem, DrivePathCrumb, Message, PromptOptions } from '../types';
+import { Agent, DriveItem, DrivePathCrumb, Message, PromptOptions, LocalUploadFile } from '../types';
 import DriveBrowser from '../components/DriveBrowser';
+
+const AI_APP_TYPES: {
+  id: NonNullable<PromptOptions['aiAppType']>;
+  label: string;
+  hint: string;
+}[] = [
+  { id: 'search_docs', label: '문서 검색', hint: 'PDF·Docs·텍스트 RAG' },
+  { id: 'chat_rag', label: '대화형 RAG', hint: 'Chat 앱 + 문서 근거' },
+  { id: 'website', label: '웹사이트', hint: '공개 URL 인덱싱' },
+  { id: 'structured', label: '구조화 데이터', hint: 'JSON/BQ/표형' },
+  { id: 'media', label: '미디어', hint: '이미지·미디어 검색' },
+];
+
+const DATA_SOURCES: {
+  id: NonNullable<PromptOptions['dataSourceType']>;
+  label: string;
+  hint: string;
+  forApps: NonNullable<PromptOptions['aiAppType']>[];
+}[] = [
+  {
+    id: 'local_upload',
+    label: '로컬 파일 첨부',
+    hint: 'PC에서 업로드 · GCP 불필요',
+    forApps: ['search_docs', 'chat_rag', 'website', 'structured', 'media'],
+  },
+  {
+    id: 'google_drive',
+    label: 'Google Drive',
+    hint: '폴더/파일 수집',
+    forApps: ['search_docs', 'chat_rag', 'media'],
+  },
+  {
+    id: 'website_url',
+    label: '웹사이트 URL',
+    hint: '공개 사이트 인덱싱',
+    forApps: ['website', 'search_docs'],
+  },
+  {
+    id: 'none',
+    label: '지식 없이 시작',
+    hint: '나중에 파일 추가',
+    forApps: ['search_docs', 'chat_rag', 'website', 'structured', 'media'],
+  },
+];
 
 const ROLES: { id: PromptOptions['role']; label: string }[] = [
   { id: 'custom', label: '🏢 사내 HR/복지 안내' },
@@ -68,6 +112,8 @@ type Props = {
   onNavigateDrive: (folderId: string, folderName: string) => void;
   onNavigateDriveCrumb: (index: number) => void;
   onSelectDriveItem: (item: DriveItem) => void;
+  localFiles: LocalUploadFile[];
+  onLocalFilesChange: (files: LocalUploadFile[]) => void;
   tenantIdInput: string;
   setTenantIdInput: (v: string) => void;
   activeAgent: Agent | null;
@@ -85,6 +131,8 @@ type Props = {
   copiedId: string | null;
   onCopy: (text: string, id: string) => void;
   serverStatus: any;
+  enableA2A?: boolean;
+  setEnableA2A?: (v: boolean) => void;
 };
 
 export default function StudioPage(props: Props) {
@@ -114,6 +162,8 @@ export default function StudioPage(props: Props) {
     onNavigateDrive,
     onNavigateDriveCrumb,
     onSelectDriveItem,
+    localFiles,
+    onLocalFilesChange,
     tenantIdInput,
     setTenantIdInput,
     activeAgent,
@@ -131,10 +181,15 @@ export default function StudioPage(props: Props) {
     copiedId,
     onCopy,
     serverStatus,
+    enableA2A,
+    setEnableA2A,
   } = props;
 
   const messages = activeAgent ? chatHistory[activeAgent.id] || [] : [];
-  const fee = options.fee ?? 0.001;
+  const fee = options.fee ?? 0;
+  const appType = options.aiAppType || 'search_docs';
+  const sourceType = options.dataSourceType || 'local_upload';
+  const sourceChoices = DATA_SOURCES.filter((s) => s.forApps.includes(appType));
   const myWalletShort = primaryWalletAddress
     ? `${primaryWalletAddress.slice(0, 4)}...${primaryWalletAddress.slice(-4)}`
     : null;
@@ -157,10 +212,18 @@ export default function StudioPage(props: Props) {
         {/* Step 1 */}
         <section className="glass-panel rounded-xl p-6 transition-all duration-300">
           <div className="flex items-center gap-2 mb-6">
-            <div className="h-8 w-8 rounded-full bg-solana-green/20 text-solana-green flex items-center justify-center font-bold border border-solana-green/30 text-sm">
+            <div className="h-8 w-8 rounded-full bg-google-blue/20 text-google-blue flex items-center justify-center font-bold border border-google-blue/30 text-sm">
               1
             </div>
-            <h2 className="text-2xl font-semibold text-on-surface">AI 에이전트 지식 기반 선택</h2>
+            <div>
+              <h2 className="text-2xl font-semibold text-on-surface">
+                AI Applications 앱 · 데이터 소스
+              </h2>
+              <p className="text-sm text-on-surface-variant mt-1">
+                GCP AI Applications에 앱+데이터스토어를 만들고, RAG에 맞는 소스를 고릅니다.
+                (location: global)
+              </p>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3 mb-4 text-sm text-on-surface-variant">
@@ -172,55 +235,220 @@ export default function StudioPage(props: Props) {
                 className="ml-1 bg-surface-container-low border border-outline-variant/30 rounded px-2 py-1 text-on-surface input-glow focus:outline-none"
               />
             </span>
-            {driveEmail ? (
-              <span className="text-solana-green">Drive: {driveEmail}</span>
-            ) : (
-              <span className="text-outline">Drive 미연결</span>
-            )}
             {primaryWalletAddress ? (
               <span className="text-solana-green font-mono text-xs">
                 유저 지갑(운영): {primaryWalletLabel || '메인'} · {primaryWalletAddress.slice(0, 4)}…
                 {primaryWalletAddress.slice(-4)}
               </span>
-            ) : (
-              <span className="text-outline text-xs">
-                유저 지갑 미연결 — 에이전트 볼트와는 별개 (헤더 Connect Wallet)
-              </span>
-            )}
+            ) : null}
           </div>
 
-          <div className="mb-4">
-            {driveEmail ? (
-              <DriveBrowser
-                items={driveItems}
-                path={drivePath}
-                selectedId={selectedFolderId}
-                selectedName={selectedDriveName}
-                selectedKind={selectedDriveKind}
-                busy={driveBusy}
-                error={driveError}
-                onNavigate={onNavigateDrive}
-                onNavigateCrumb={onNavigateDriveCrumb}
-                onSelect={onSelectDriveItem}
-                emptyHint="이 위치에 폴더/파일이 없습니다. 상위 폴더로 이동하거나 Drive에서 항목을 추가하세요."
+          <div className="mb-5">
+            <p className="text-sm font-medium text-on-surface-variant mb-2">앱 유형</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {AI_APP_TYPES.map((t) => {
+                const active = appType === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => {
+                      const nextSources = DATA_SOURCES.filter((s) => s.forApps.includes(t.id));
+                      const keep = nextSources.some((s) => s.id === sourceType);
+                      setOptions((prev) => ({
+                        ...prev,
+                        aiAppType: t.id,
+                        dataSourceType: keep ? prev.dataSourceType : nextSources[0]?.id || 'none',
+                      }));
+                    }}
+                    className={
+                      active
+                        ? 'text-left px-4 py-3 rounded-lg border border-google-blue bg-google-blue/10'
+                        : 'text-left px-4 py-3 rounded-lg border border-outline-variant/30 bg-surface-container-low hover:border-outline-variant/50'
+                    }
+                  >
+                    <p className="text-sm font-semibold text-on-surface">{t.label}</p>
+                    <p className="text-xs text-on-surface-variant mt-0.5">{t.hint}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="mb-5">
+            <p className="text-sm font-medium text-on-surface-variant mb-2">데이터 소스</p>
+            <div className="flex flex-wrap gap-2">
+              {sourceChoices.map((s) => {
+                const active = sourceType === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setOptions((prev) => ({ ...prev, dataSourceType: s.id }))}
+                    className={
+                      active
+                        ? 'px-3 py-2 rounded-lg border border-solana-green bg-solana-green/10 text-sm'
+                        : 'px-3 py-2 rounded-lg border border-outline-variant/30 text-sm text-on-surface-variant'
+                    }
+                    title={s.hint}
+                  >
+                    {s.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {sourceType === 'website_url' ? (
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-on-surface-variant mb-2">
+                웹사이트 URL
+              </label>
+              <input
+                type="url"
+                value={options.websiteUri || ''}
+                onChange={(e) => setOptions((prev) => ({ ...prev, websiteUri: e.target.value }))}
+                placeholder="https://docs.example.com"
+                className="w-full bg-surface-container-low border border-outline-variant/30 rounded-lg px-4 py-2 text-on-surface"
               />
-            ) : (
-              <p className="text-sm text-on-surface-variant py-2">
-                Google Drive를 연결하면 폴더·파일을 탐색하고 지식 기반으로 선택할 수 있습니다.
-                없이도 에이전트 생성은 가능합니다.
-              </p>
-            )}
-          </div>
+            </div>
+          ) : null}
 
-          <button
-            type="button"
-            disabled={driveBusy}
-            onClick={driveEmail && onRefreshDrive ? onRefreshDrive : onConnectDrive}
-            className="flex items-center justify-center gap-2 w-full py-3 rounded-lg border border-google-blue text-google-blue hover:bg-google-blue/10 transition-colors text-sm font-medium disabled:opacity-50"
-          >
-            <Plus className="w-4 h-4" />
-            {driveEmail ? '현재 폴더 새로고침' : 'Google Drive 연결하기'}
-          </button>
+          {sourceType === 'local_upload' ? (
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-on-surface-variant mb-2">
+                RAG 문서 첨부 (txt / md / json / csv / html / pdf)
+              </label>
+              <input
+                type="file"
+                multiple
+                accept=".txt,.md,.markdown,.json,.csv,.tsv,.log,.html,.htm,.xml,.yml,.yaml,.pdf,text/*,application/json,application/pdf"
+                onChange={async (e) => {
+                  const list = e.target.files;
+                  if (!list?.length) return;
+                  const next: LocalUploadFile[] = [];
+                  const toBase64 = async (file: File): Promise<string> => {
+                    const buf = await file.arrayBuffer();
+                    const bytes = new Uint8Array(buf);
+                    let binary = '';
+                    const chunk = 0x8000;
+                    for (let i = 0; i < bytes.length; i += chunk) {
+                      binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+                    }
+                    return btoa(binary);
+                  };
+                  for (const file of Array.from(list).slice(0, 25) as File[]) {
+                    try {
+                      const isPdf =
+                        file.type === 'application/pdf' ||
+                        file.name.toLowerCase().endsWith('.pdf');
+                      if (isPdf) {
+                        if (file.size > 8_000_000) continue;
+                        next.push({
+                          name: file.name,
+                          mimeType: 'application/pdf',
+                          contentBase64: await toBase64(file),
+                        });
+                      } else {
+                        const text = await file.text();
+                        next.push({
+                          name: file.name,
+                          mimeType: file.type || 'text/plain',
+                          text: text.slice(0, 12_000),
+                        });
+                      }
+                    } catch {
+                      /* skip unreadable */
+                    }
+                  }
+                  onLocalFilesChange([...localFiles, ...next].slice(0, 25));
+                  e.target.value = '';
+                }}
+                className="block w-full text-sm text-on-surface-variant file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-google-blue/15 file:text-google-blue file:font-medium"
+              />
+              {localFiles.length > 0 ? (
+                <ul className="mt-3 space-y-1.5">
+                  {localFiles.map((f, i) => (
+                    <li
+                      key={`${f.name}-${i}`}
+                      className="flex items-center justify-between gap-2 text-sm bg-surface-container-low rounded-lg px-3 py-2"
+                    >
+                      <span className="truncate text-on-surface">
+                        {f.name}
+                        <span className="text-xs text-on-surface-variant ml-2">
+                          {f.contentBase64
+                            ? 'PDF → AI Applications'
+                            : `${(f.text?.length || 0).toLocaleString()}자`}
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        className="text-xs text-outline hover:text-on-surface shrink-0"
+                        onClick={() =>
+                          onLocalFilesChange(localFiles.filter((_, idx) => idx !== i))
+                        }
+                      >
+                        제거
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-on-surface-variant mt-2">
+                  파일을 올리면 SolVamos가 AI Applications 데이터스토어에 넣습니다. PDF는 Google이
+                  파싱합니다 (최대 8MB/파일). GCP 콘솔 작업은 필요 없습니다.
+                </p>
+              )}
+            </div>
+          ) : null}
+
+          {sourceType === 'none' && (
+            <p className="text-xs text-on-surface-variant mb-4">
+              앱과 빈 데이터스토어만 만듭니다. 나중에 로컬 파일 추가로 지식을 넣을 수 있습니다.
+            </p>
+          )}
+
+          {sourceType === 'google_drive' ? (
+            <>
+              <div className="flex flex-wrap gap-3 text-sm mb-4">
+                {driveEmail ? (
+                  <span className="text-solana-green">Drive: {driveEmail}</span>
+                ) : (
+                  <span className="text-outline">Drive 미연결</span>
+                )}
+              </div>
+              <div className="mb-4">
+                {driveEmail ? (
+                  <DriveBrowser
+                    items={driveItems}
+                    path={drivePath}
+                    selectedId={selectedFolderId}
+                    selectedName={selectedDriveName}
+                    selectedKind={selectedDriveKind}
+                    busy={driveBusy}
+                    error={driveError}
+                    onNavigate={onNavigateDrive}
+                    onNavigateCrumb={onNavigateDriveCrumb}
+                    onSelect={onSelectDriveItem}
+                    emptyHint="이 위치에 폴더/파일이 없습니다."
+                  />
+                ) : (
+                  <p className="text-sm text-on-surface-variant py-2">
+                    Google Drive를 연결한 뒤 폴더·파일을 선택하세요.
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                disabled={driveBusy}
+                onClick={driveEmail && onRefreshDrive ? onRefreshDrive : onConnectDrive}
+                className="flex items-center justify-center gap-2 w-full py-3 rounded-lg border border-google-blue text-google-blue hover:bg-google-blue/10 transition-colors text-sm font-medium disabled:opacity-50"
+              >
+                <Plus className="w-4 h-4" />
+                {driveEmail ? '현재 폴더 새로고침' : 'Google Drive 연결하기'}
+              </button>
+            </>
+          ) : null}
         </section>
 
         {/* Step 2 */}
@@ -432,15 +660,31 @@ export default function StudioPage(props: Props) {
       {/* Sandbox */}
       <div className="flex flex-col gap-6 h-full lg:w-[35%] xl:w-[30%]">
         <section className="glass-panel rounded-xl flex flex-col h-full border border-outline-variant/20 overflow-hidden relative min-h-[480px]">
-          <div className="p-4 border-b border-outline-variant/20 bg-surface-container-high/50 flex justify-between items-center">
+          <div className="p-4 border-b border-outline-variant/20 bg-surface-container-high/50 flex justify-between items-center gap-2 flex-wrap">
             <div className="flex items-center gap-2">
               <FlaskConical className="w-5 h-5 text-primary" />
               <h3 className="font-semibold text-on-surface text-lg">에이전트 실시간 테스트</h3>
             </div>
-            <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75" />
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-secondary" />
-            </span>
+            <div className="flex items-center gap-3">
+              {setEnableA2A ? (
+                <label className="flex items-center gap-2 text-xs text-on-surface-variant cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={!!enableA2A}
+                    onChange={(e) => setEnableA2A(e.target.checked)}
+                    className="accent-google-blue"
+                  />
+                  A2A 피어 호출
+                  <span className="text-[10px] text-outline">
+                    ({serverStatus?.paymentNetwork || 'sandbox'})
+                  </span>
+                </label>
+              ) : null}
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-secondary" />
+              </span>
+            </div>
           </div>
 
           <div className="flex-1 p-4 flex flex-col gap-3 overflow-y-auto min-h-[320px] max-h-[420px]">

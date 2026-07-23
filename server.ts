@@ -11,8 +11,10 @@ import dotenv from 'dotenv';
 import { compileSystemPrompt } from './server/prompt.js';
 import { savePrivateKeyToGCP, createAgentVaultKeypair } from './server/vault.js';
 import { verifyPayment } from './server/payment.js';
-import { ensureDriveDataStore, syncLocalCorpusToVertex } from './server/rag.js';
+import { ensureAiApplication, syncLocalCorpusToVertex } from './server/rag.js';
+import { aiApplicationsCatalog, getDataSourceType } from './server/ai-applications.js';
 import { ingestDriveSourceForAgent } from './server/drive-ingest.js';
+import { ingestLocalUploadsForAgent } from './server/local-ingest.js';
 import { registerDriveAuthRoutes, isDriveAuthAvailable, isOAuthClientConfigured, requireGoogleSession, resolveSessionId, getSession } from './server/drive-oauth.js';
 import { loadTenants, listTenants, getTenant, upsertTenant } from './server/tenants.js';
 import { provisionCustomerProject, plannedProjectId, buildProvisionPlan, resolveTenancyMode } from './server/provision.js';
@@ -48,7 +50,7 @@ dotenv.config();
 assertProductionSafety();
 
 const app = express();
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '20mb' }));
 app.disable('x-powered-by');
 
 app.use((_req, res, next) => {
@@ -273,6 +275,10 @@ app.get('/api/agents', async (_req, res) => {
   res.json({ status: 'success', data: await listAgents() });
 });
 
+app.get('/api/ai-applications/catalog', (_req, res) => {
+  res.json({ status: 'success', ...aiApplicationsCatalog() });
+});
+
 async function walletOwnerFromReq(req: import('express').Request): Promise<string> {
   const sid = await resolveSessionId(req);
   const session = sid ? getSession(sid) : undefined;
@@ -367,6 +373,11 @@ app.post('/api/agents/create', requireGoogleSession, async (req, res) => {
       agentName,
       perCallPriceUsdc,
       fee,
+      aiAppType,
+      dataSourceType,
+      websiteUri,
+      gcsUri,
+      localFiles,
     } = req.body;
 
     if (!role || !tone || !securityLevel) {
@@ -395,7 +406,19 @@ app.post('/api/agents/create', requireGoogleSession, async (req, res) => {
     // User wallet = operator only (funding / display). Never agent vault.
     const userPrimary = getPrimaryWallet(owner);
 
-    if (googleDriveFolderId && !sid) {
+    const sourceMeta = getDataSourceType(dataSourceType);
+    const localFileList = Array.isArray(localFiles) ? localFiles : [];
+    const hasLocalFiles = localFileList.length > 0;
+    const resolvedSource =
+      sourceMeta.id === 'google_drive' || googleDriveFolderId
+        ? 'google_drive'
+        : hasLocalFiles || sourceMeta.id === 'local_upload'
+          ? 'local_upload'
+          : sourceMeta.id;
+    const needsDrive = resolvedSource === 'google_drive' && !!googleDriveFolderId;
+    const needsLocal = resolvedSource === 'local_upload' && hasLocalFiles;
+
+    if (needsDrive && !sid) {
       res.status(401).json({
         status: 'error',
         message: 'Drive 연동이 필요합니다. 마이페이지에서 Google을 연결하세요.',
@@ -458,6 +481,10 @@ app.post('/api/agents/create', requireGoogleSession, async (req, res) => {
       created: new Date().toISOString(),
       invokeCount: 0,
       googleDriveFolderId: googleDriveFolderId ? String(googleDriveFolderId) : undefined,
+      aiAppType: aiAppType || 'search_docs',
+      dataSourceType: resolvedSource,
+      websiteUri: websiteUri ? String(websiteUri) : undefined,
+      gcsUri: gcsUri ? String(gcsUri) : undefined,
       secretManagerPath: gcpStorage.path,
       status: 'CREATING',
       fee: parsedFeeEarly,
@@ -466,28 +493,35 @@ app.post('/api/agents/create', requireGoogleSession, async (req, res) => {
     pipeline.push({ step: 'agent_record_draft', status: 'ok', detail: agentId });
 
     let vertexDataStoreId: string | undefined;
+    let vertexEngineId: string | undefined;
     let indexingStatus: AgentRecord['status'] = 'ACTIVE';
     let driveIngest: { docs: number; message?: string } | null = null;
 
-    if (googleDriveFolderId) {
-      const ds = await ensureDriveDataStore({
-        displayName: agentName || agentId,
-        driveFolderId: String(googleDriveFolderId),
-      });
-      vertexDataStoreId = ds.dataStoreId;
-      indexingStatus =
-        ds.status === 'pending' || ds.status === 'error' ? 'INDEXING' : 'ACTIVE';
-      pipeline.push({
-        step: 'vertex_datastore',
-        status: ds.status === 'created' || ds.status === 'existing' ? 'ok' : 'warn',
-        detail: `${ds.message || ds.dataStoreId}${
-          (ds as any).engineId ? ` engine=${(ds as any).engineId}` : ''
-        }`,
-      });
+    // Always provision AI Applications (data store + app/engine) — Drive is optional source
+    const aiApp = await ensureAiApplication({
+      displayName: agentName || agentId,
+      appType: aiAppType || 'search_docs',
+      dataSourceType: resolvedSource,
+      driveFolderId: googleDriveFolderId ? String(googleDriveFolderId) : undefined,
+      websiteUri: websiteUri ? String(websiteUri) : undefined,
+      gcsUri: gcsUri ? String(gcsUri) : undefined,
+    });
+    vertexDataStoreId = aiApp.dataStoreId;
+    vertexEngineId = aiApp.engineId;
+    indexingStatus =
+      aiApp.status === 'pending' || aiApp.status === 'error' ? 'INDEXING' : 'ACTIVE';
+    pipeline.push({
+      step: 'ai_applications',
+      status: aiApp.status === 'created' || aiApp.status === 'existing' ? 'ok' : 'warn',
+      detail: `${aiApp.message || aiApp.dataStoreId}${
+        aiApp.engineId ? ` engine=${aiApp.engineId}` : ''
+      }${aiApp.sourceNote ? ` · ${aiApp.sourceNote}` : ''}`,
+    });
 
+    if (needsDrive && sid) {
       try {
         const corpus = await ingestDriveSourceForAgent({
-          sessionId: sid!,
+          sessionId: sid,
           agentId,
           driveSourceId: String(googleDriveFolderId),
         });
@@ -499,10 +533,10 @@ app.post('/api/agents/create', requireGoogleSession, async (req, res) => {
           detail:
             corpus.docs.length > 0
               ? `Ingested ${corpus.docs.length} Drive doc(s)`
-              : 'No text-extractable files (Docs/Sheets/txt/md/json). PDF는 현재 스킵됩니다.',
+              : 'No text-extractable files (Docs/Sheets/txt/md/json/pdf).',
         });
 
-        if (vertexDataStoreId && corpus.docs.length > 0 && ds.status !== 'error') {
+        if (vertexDataStoreId && corpus.docs.length > 0 && aiApp.status !== 'error') {
           try {
             const sync = await syncLocalCorpusToVertex(agentId, vertexDataStoreId);
             pipeline.push({
@@ -527,11 +561,72 @@ app.post('/api/agents/create', requireGoogleSession, async (req, res) => {
         });
         indexingStatus = 'INDEXING';
       }
+    } else if (needsLocal) {
+      try {
+        const corpus = await ingestLocalUploadsForAgent({
+          agentId,
+          files: localFileList,
+        });
+        driveIngest = {
+          docs: corpus.docs.length,
+          message: corpus.skipped?.length
+            ? `skipped: ${corpus.skipped.slice(0, 3).join('; ')}`
+            : undefined,
+        };
+        indexingStatus = corpus.docs.length > 0 ? 'ACTIVE' : indexingStatus;
+        pipeline.push({
+          step: 'local_upload_ingest',
+          status: corpus.docs.length > 0 ? 'ok' : 'warn',
+          detail:
+            corpus.docs.length > 0
+              ? `Ingested ${corpus.docs.length} local file(s)`
+              : `No text extracted. ${corpus.skipped?.join(' · ') || 'Use txt/md/json/csv/html/pdf'}`,
+        });
+
+        if (vertexDataStoreId && corpus.docs.length > 0 && aiApp.status !== 'error') {
+          try {
+            const sync = await syncLocalCorpusToVertex(agentId, vertexDataStoreId);
+            pipeline.push({
+              step: 'vertex_import',
+              status: sync.imported > 0 ? 'ok' : 'warn',
+              detail: sync.message,
+            });
+            if (sync.imported > 0) indexingStatus = 'ACTIVE';
+          } catch (err: any) {
+            pipeline.push({
+              step: 'vertex_import',
+              status: 'warn',
+              detail: err?.message || 'Vertex import failed — local corpus still usable',
+            });
+          }
+        }
+      } catch (err: any) {
+        pipeline.push({
+          step: 'local_upload_ingest',
+          status: 'warn',
+          detail: err?.message || 'Local upload ingest failed',
+        });
+        indexingStatus = 'INDEXING';
+      }
+    } else if (resolvedSource === 'local_upload') {
+      pipeline.push({
+        step: 'local_upload',
+        status: 'skip',
+        detail: 'local_upload selected but no files — empty datastore + app only (add files later)',
+      });
+    } else if (resolvedSource !== 'google_drive') {
+      pipeline.push({
+        step: 'data_source',
+        status: 'ok',
+        detail:
+          aiApp.sourceNote ||
+          `Source=${resolvedSource} — app+datastore ready`,
+      });
     } else {
       pipeline.push({
         step: 'drive_rag',
         status: 'skip',
-        detail: 'No Drive folder/file selected — answers without RAG grounding',
+        detail: 'google_drive selected but no folder/file — empty datastore + app only',
       });
     }
 
@@ -551,6 +646,11 @@ app.post('/api/agents/create', requireGoogleSession, async (req, res) => {
       invokeCount: 0,
       googleDriveFolderId: googleDriveFolderId ? String(googleDriveFolderId) : undefined,
       vertexDataStoreId,
+      vertexEngineId,
+      aiAppType: aiApp.appType,
+      dataSourceType: aiApp.dataSourceType,
+      websiteUri: websiteUri ? String(websiteUri) : undefined,
+      gcsUri: gcsUri ? String(gcsUri) : undefined,
       secretManagerPath: gcpStorage.path,
       status: indexingStatus,
       fee: parsedFee,
@@ -590,6 +690,9 @@ app.post('/api/agents/create', requireGoogleSession, async (req, res) => {
       gcpVaultPath: gcpStorage.path,
       isGcpMocked: gcpStorage.mock,
       vertexDataStoreId,
+      vertexEngineId,
+      aiAppType: newAgent.aiAppType,
+      dataSourceType: newAgent.dataSourceType,
       driveIngest,
       pipeline,
       agent: newAgent,
@@ -627,6 +730,11 @@ app.patch('/api/agents/:id', requireGoogleSession, async (req, res) => {
       status,
       googleDriveFolderId,
       description,
+      aiAppType,
+      dataSourceType,
+      websiteUri,
+      gcsUri,
+      localFiles,
     } = req.body || {};
 
     const nextRole = role || existing.role;
@@ -647,16 +755,59 @@ app.patch('/api/agents/:id', requireGoogleSession, async (req, res) => {
         : status === 'ACTIVE' || status === 'active'
           ? 'ACTIVE'
           : existing.status || 'ACTIVE';
+    const nextAiAppType = aiAppType || existing.aiAppType || 'search_docs';
+    const localFileList = Array.isArray(localFiles) ? localFiles : [];
+    const hasLocalFiles = localFileList.length > 0;
+    const sourceMeta = getDataSourceType(
+      dataSourceType || (hasLocalFiles ? 'local_upload' : existing.dataSourceType)
+    );
+    const nextWebsite =
+      websiteUri !== undefined
+        ? websiteUri
+          ? String(websiteUri)
+          : undefined
+        : existing.websiteUri;
+    const nextGcs =
+      gcsUri !== undefined ? (gcsUri ? String(gcsUri) : undefined) : existing.gcsUri;
 
     const folderChanged =
       googleDriveFolderId !== undefined &&
       String(googleDriveFolderId || '') !== String(existing.googleDriveFolderId || '');
+    const nextFolder =
+      googleDriveFolderId !== undefined
+        ? googleDriveFolderId
+          ? String(googleDriveFolderId)
+          : undefined
+        : existing.googleDriveFolderId;
+    const resolvedSource =
+      sourceMeta.id === 'google_drive' || nextFolder
+        ? 'google_drive'
+        : hasLocalFiles || sourceMeta.id === 'local_upload'
+          ? 'local_upload'
+          : sourceMeta.id;
 
     let vertexDataStoreId = existing.vertexDataStoreId;
-    let driveIngest: { docs: number } | null = null;
+    let vertexEngineId = existing.vertexEngineId;
+    let driveIngest: { docs: number; message?: string } | null = null;
     let indexingStatus = nextStatus;
 
-    if (folderChanged && googleDriveFolderId) {
+    // Missing store (legacy agents) or Drive source change → ensure AI Applications bundle
+    if (!vertexDataStoreId || (folderChanged && nextFolder) || hasLocalFiles) {
+      const aiApp = await ensureAiApplication({
+        displayName: nextName || existing.id,
+        appType: nextAiAppType,
+        dataSourceType: resolvedSource,
+        driveFolderId: nextFolder,
+        websiteUri: nextWebsite,
+        gcsUri: nextGcs,
+      });
+      if (aiApp.status !== 'error') {
+        vertexDataStoreId = aiApp.dataStoreId;
+        vertexEngineId = aiApp.engineId || vertexEngineId;
+      }
+    }
+
+    if (folderChanged && nextFolder) {
       const me = await getMeFromRequest(req);
       const sid = me.sessionId || (await resolveSessionId(req));
       if (!sid) {
@@ -666,19 +817,34 @@ app.patch('/api/agents/:id', requireGoogleSession, async (req, res) => {
         });
         return;
       }
-      const ds = await ensureDriveDataStore({
-        displayName: nextName || existing.id,
-        driveFolderId: String(googleDriveFolderId),
-      });
-      vertexDataStoreId = ds.dataStoreId;
       try {
         const corpus = await ingestDriveSourceForAgent({
           sessionId: sid,
           agentId: existing.id,
-          driveSourceId: String(googleDriveFolderId),
+          driveSourceId: String(nextFolder),
         });
         driveIngest = { docs: corpus.docs.length };
-        if (vertexDataStoreId && corpus.docs.length > 0 && ds.status !== 'error') {
+        if (vertexDataStoreId && corpus.docs.length > 0) {
+          await syncLocalCorpusToVertex(existing.id, vertexDataStoreId).catch(() => null);
+        }
+        indexingStatus = corpus.docs.length > 0 ? 'ACTIVE' : 'INDEXING';
+      } catch {
+        indexingStatus = 'INDEXING';
+      }
+    } else if (hasLocalFiles) {
+      try {
+        const corpus = await ingestLocalUploadsForAgent({
+          agentId: existing.id,
+          files: localFileList,
+          append: true,
+        });
+        driveIngest = {
+          docs: corpus.docs.length,
+          message: corpus.skipped?.length
+            ? `skipped: ${corpus.skipped.slice(0, 3).join('; ')}`
+            : undefined,
+        };
+        if (vertexDataStoreId && corpus.docs.length > 0) {
           await syncLocalCorpusToVertex(existing.id, vertexDataStoreId).catch(() => null);
         }
         indexingStatus = corpus.docs.length > 0 ? 'ACTIVE' : 'INDEXING';
@@ -698,13 +864,13 @@ app.patch('/api/agents/:id', requireGoogleSession, async (req, res) => {
       fee: nextFee,
       perCallPriceUsdc: nextFee,
       status: indexingStatus,
-      googleDriveFolderId:
-        googleDriveFolderId !== undefined
-          ? googleDriveFolderId
-            ? String(googleDriveFolderId)
-            : undefined
-          : existing.googleDriveFolderId,
+      googleDriveFolderId: nextFolder,
       vertexDataStoreId,
+      vertexEngineId,
+      aiAppType: nextAiAppType,
+      dataSourceType: resolvedSource,
+      websiteUri: nextWebsite,
+      gcsUri: nextGcs,
       // Vault pubkey never changes on edit
       publicKey: existing.publicKey,
       secretManagerPath: existing.secretManagerPath,

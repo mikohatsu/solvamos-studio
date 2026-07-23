@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Agent, DriveItem, DrivePathCrumb, Message, PromptOptions, Settlement } from './types';
+import { Agent, DriveItem, DrivePathCrumb, LocalUploadFile, Message, PromptOptions, Settlement } from './types';
 import Landing from './Landing';
 import AppShell, { AppTab } from './AppShell';
 import StudioPage from './pages/StudioPage';
@@ -72,6 +72,8 @@ export default function App() {
     tone: 'professional',
     securityLevel: 'strict',
     fee: 0,
+    aiAppType: 'search_docs',
+    dataSourceType: 'local_upload',
   });
   const [agentName, setAgentName] = useState('사내 복지 안내 AI 비서');
   const [livePromptPreview, setLivePromptPreview] = useState('');
@@ -91,6 +93,8 @@ export default function App() {
   const [paymentLogs, setPaymentLogs] = useState<string[]>([]);
   const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
   const [customSignature, setCustomSignature] = useState('');
+  /** Studio: off by default (direct Vertex). Turn on to demo pay.sh peer hops. */
+  const [enableA2A, setEnableA2A] = useState(false);
 
   const [driveSessionId, setDriveSessionId] = useState<string>(
     () => localStorage.getItem('solvamos_drive_session') || ''
@@ -106,6 +110,7 @@ export default function App() {
   const [selectedDriveKind, setSelectedDriveKind] = useState<'folder' | 'file' | null>(null);
   const [driveBusy, setDriveBusy] = useState(false);
   const [driveError, setDriveError] = useState<string | null>(null);
+  const [localFiles, setLocalFiles] = useState<LocalUploadFile[]>([]);
   const [tenantIdInput, setTenantIdInput] = useState('demo');
 
   const [wallets, setWallets] = useState<WalletRow[]>([]);
@@ -246,6 +251,7 @@ export default function App() {
     setSelectedFolderId(item.id);
     setSelectedDriveName(item.name);
     setSelectedDriveKind(kind);
+    setOptions((prev) => ({ ...prev, dataSourceType: 'google_drive' }));
   };
 
   const fetchWallets = async () => {
@@ -530,9 +536,14 @@ export default function App() {
       tone: (agent.tone as PromptOptions['tone']) || 'professional',
       securityLevel: (agent.securityLevel as PromptOptions['securityLevel']) || 'strict',
       fee: agent.fee ?? agent.perCallPriceUsdc ?? 0,
+      aiAppType: (agent.aiAppType as PromptOptions['aiAppType']) || 'search_docs',
+      dataSourceType: (agent.dataSourceType as PromptOptions['dataSourceType']) || 'local_upload',
+      websiteUri: agent.websiteUri,
+      gcsUri: agent.gcsUri,
     });
     setAgentName(agent.agentName || agent.customRole || '');
     setSelectedFolderId(agent.googleDriveFolderId || '');
+    setLocalFiles([]);
     setActiveTab('studio');
   };
 
@@ -547,10 +558,15 @@ export default function App() {
       tone: 'professional',
       securityLevel: 'strict',
       fee: 0,
+      aiAppType: 'search_docs',
+      dataSourceType: 'local_upload',
+      websiteUri: undefined,
+      gcsUri: undefined,
     });
     setAgentName('사내 복지 안내 AI 비서');
     setSelectedFolderId('');
     setSelectedDriveName(null);
+    setLocalFiles([]);
     setActiveTab('studio');
   };
 
@@ -589,18 +605,27 @@ export default function App() {
       // 생성: 폴더 선택 시 포함. 편집: 폴더를 바꿨을 때만 포함(재수집 방지)
       if (!isEdit) {
         if (selectedFolderId) payload.googleDriveFolderId = selectedFolderId;
+        if (localFiles.length) payload.localFiles = localFiles;
       } else if (folderChanged) {
         payload.googleDriveFolderId = selectedFolderId || '';
+      } else if (localFiles.length) {
+        payload.localFiles = localFiles;
       }
 
       setCreateDetail(
         isEdit
           ? folderChanged
             ? '메타 저장 · Drive 소스 변경 재수집'
-            : '메타·요금 저장 (vault/ID 유지)'
-          : selectedFolderId
-            ? `Drive 소스 ${selectedDriveName || selectedFolderId} 수집 · Vertex · 카탈로그…`
-            : 'Drive 미선택 — 메타·카탈로그만 생성'
+            : localFiles.length
+              ? `로컬 파일 ${localFiles.length}건 추가 · 메타 저장`
+              : '메타·요금 저장 (vault/ID 유지)'
+          : localFiles.length
+            ? `로컬 파일 ${localFiles.length}건 · AI Applications · 카탈로그…`
+            : selectedFolderId
+              ? `Drive ${selectedDriveName || selectedFolderId} · AI Applications · 카탈로그…`
+              : `AI Applications (${options.aiAppType || 'search_docs'} / ${
+                  options.dataSourceType || 'local_upload'
+                }) · 카탈로그…`
       );
 
       const res = await fetch(isEdit ? `/api/agents/${targetId}` : '/api/agents/create', {
@@ -645,6 +670,7 @@ export default function App() {
         // 저장 후에도 편집 모드 유지 → 다시 누르면 PATCH (신규 게시 방지)
         setEditingAgentId(saved.id);
         setEditBaselineFolderId(saved.googleDriveFolderId || '');
+        setLocalFiles([]);
         setBuilderStep(3);
         setActiveTab('studio');
         await new Promise((r) => setTimeout(r, 450));
@@ -705,7 +731,9 @@ export default function App() {
           {
             id: 'loading-placeholder',
             sender: 'system',
-            text: '⏳ Vertex AI Gemini 응답 생성 중… (GCP ADC)',
+            text: enableA2A
+              ? '⏳ A2A + Vertex 응답 생성 중… (필요 시 카탈로그 피어 호출)'
+              : '⏳ Vertex AI Gemini 응답 생성 중… (GCP ADC)',
             timestamp: new Date().toLocaleTimeString(),
             paymentStatus: 'none',
           },
@@ -724,7 +752,7 @@ export default function App() {
         body: JSON.stringify({
           prompt: promptText,
           studioTest: true,
-          enableA2A: false,
+          enableA2A,
         }),
       });
       const data = await res.json();
@@ -1050,6 +1078,8 @@ export default function App() {
           onNavigateDrive={navigateDriveFolder}
           onNavigateDriveCrumb={navigateDriveCrumb}
           onSelectDriveItem={selectDriveItem}
+          localFiles={localFiles}
+          onLocalFilesChange={setLocalFiles}
           tenantIdInput={tenantIdInput}
           setTenantIdInput={setTenantIdInput}
           activeAgent={activeAgent}
@@ -1067,6 +1097,8 @@ export default function App() {
           copiedId={copiedId}
           onCopy={handleCopyText}
           serverStatus={serverStatus}
+          enableA2A={enableA2A}
+          setEnableA2A={setEnableA2A}
         />
       )}
       {activeTab === 'list' && (

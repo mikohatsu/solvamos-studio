@@ -10,8 +10,11 @@ export type LocalRagDoc = {
   id: string;
   name: string;
   mimeType: string;
+  /** Plain text for text sources; placeholder for PDF (indexed by AI Applications). */
   text: string;
   webViewLink?: string;
+  /** Base64 raw bytes for PDF/binary → Vertex import with original mimeType */
+  contentBase64?: string;
 };
 
 export type LocalRagCorpus = {
@@ -24,15 +27,27 @@ export type LocalRagCorpus = {
 const MAX_FILES = 25;
 const MAX_CHARS_PER_FILE = 12_000;
 const MAX_TOTAL_CHARS = 80_000;
+const MAX_PDF_BYTES = 8_000_000;
 
 function corpusPath(agentId: string) {
   return dataFile(`rag/${agentId}.json`);
 }
 
-async function readFileText(
+function isPdf(name: string | null | undefined, mime: string | null | undefined): boolean {
+  const m = (mime || '').toLowerCase();
+  const n = (name || '').toLowerCase();
+  return m === 'application/pdf' || n.endsWith('.pdf');
+}
+
+type DriveReadResult =
+  | { kind: 'text'; text: string }
+  | { kind: 'pdf'; base64: string; byteLength: number }
+  | null;
+
+async function readDriveFile(
   drive: Awaited<ReturnType<typeof authedDrive>>,
   file: { id: string; name?: string | null; mimeType?: string | null }
-): Promise<string | null> {
+): Promise<DriveReadResult> {
   const mime = file.mimeType || '';
   const id = file.id!;
   try {
@@ -47,7 +62,19 @@ async function readFileText(
         { responseType: 'text' }
       );
       const text = String(res.data || '');
-      return text.slice(0, MAX_CHARS_PER_FILE);
+      return { kind: 'text', text: text.slice(0, MAX_CHARS_PER_FILE) };
+    }
+    if (isPdf(file.name, mime)) {
+      const res = await drive.files.get(
+        { fileId: id, alt: 'media' },
+        { responseType: 'arraybuffer' }
+      );
+      const buf = Buffer.from(res.data as ArrayBuffer);
+      if (buf.length > MAX_PDF_BYTES) {
+        console.warn('[drive-ingest] PDF too large', file.name, buf.length);
+        return null;
+      }
+      return { kind: 'pdf', base64: buf.toString('base64'), byteLength: buf.length };
     }
     if (
       mime.startsWith('text/') ||
@@ -59,12 +86,42 @@ async function readFileText(
         { fileId: id, alt: 'media' },
         { responseType: 'text' }
       );
-      return String(res.data || '').slice(0, MAX_CHARS_PER_FILE);
+      return { kind: 'text', text: String(res.data || '').slice(0, MAX_CHARS_PER_FILE) };
     }
   } catch (err) {
     console.warn('[drive-ingest] skip file', file.name, err);
   }
   return null;
+}
+
+function pushDriveDoc(
+  acc: LocalRagDoc[],
+  totalChars: { n: number },
+  file: { id: string; name?: string | null; mimeType?: string | null; webViewLink?: string | null },
+  read: DriveReadResult
+): void {
+  if (!read || acc.length >= MAX_FILES) return;
+  if (read.kind === 'text') {
+    if (!read.text.trim() || totalChars.n >= MAX_TOTAL_CHARS) return;
+    acc.push({
+      id: file.id!,
+      name: file.name || '(untitled)',
+      mimeType: file.mimeType || 'text/plain',
+      text: read.text,
+      webViewLink: file.webViewLink || undefined,
+    });
+    totalChars.n += read.text.length;
+    return;
+  }
+  // PDF — AI Applications parses; keep stub text for local corpus listing
+  acc.push({
+    id: file.id!,
+    name: file.name || '(untitled).pdf',
+    mimeType: 'application/pdf',
+    text: `[PDF ${Math.round(read.byteLength / 1024)}KB — indexed by AI Applications] ${file.name || ''}`,
+    webViewLink: file.webViewLink || undefined,
+    contentBase64: read.base64,
+  });
 }
 
 async function collectFromFolder(
@@ -74,7 +131,7 @@ async function collectFromFolder(
   acc: LocalRagDoc[],
   totalChars: { n: number }
 ): Promise<void> {
-  if (depth > 2 || acc.length >= MAX_FILES || totalChars.n >= MAX_TOTAL_CHARS) return;
+  if (depth > 2 || acc.length >= MAX_FILES) return;
   const res = await drive.files.list({
     q: `'${folderId.replace(/'/g, "\\'")}' in parents and trashed = false`,
     fields: 'files(id, name, mimeType, webViewLink)',
@@ -83,21 +140,13 @@ async function collectFromFolder(
     includeItemsFromAllDrives: true,
   });
   for (const f of res.data.files || []) {
-    if (acc.length >= MAX_FILES || totalChars.n >= MAX_TOTAL_CHARS) break;
+    if (acc.length >= MAX_FILES) break;
     if (f.mimeType === 'application/vnd.google-apps.folder') {
       await collectFromFolder(drive, f.id!, depth + 1, acc, totalChars);
       continue;
     }
-    const text = await readFileText(drive, f as any);
-    if (!text || !text.trim()) continue;
-    acc.push({
-      id: f.id!,
-      name: f.name || '(untitled)',
-      mimeType: f.mimeType || 'unknown',
-      text,
-      webViewLink: f.webViewLink || undefined,
-    });
-    totalChars.n += text.length;
+    const read = await readDriveFile(drive, f as any);
+    pushDriveDoc(acc, totalChars, f as any, read);
   }
 }
 
@@ -119,16 +168,8 @@ export async function ingestDriveSourceForAgent(opts: {
   if (mime === 'application/vnd.google-apps.folder') {
     await collectFromFolder(drive, opts.driveSourceId, 0, docs, totalChars);
   } else {
-    const text = await readFileText(drive, meta.data as any);
-    if (text?.trim()) {
-      docs.push({
-        id: meta.data.id!,
-        name: meta.data.name || '(untitled)',
-        mimeType: mime,
-        text,
-        webViewLink: meta.data.webViewLink || undefined,
-      });
-    }
+    const read = await readDriveFile(drive, meta.data as any);
+    pushDriveDoc(docs, totalChars, meta.data as any, read);
   }
 
   const corpus: LocalRagCorpus = {

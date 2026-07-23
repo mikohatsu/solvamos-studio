@@ -20,6 +20,11 @@ export interface AgentRecord {
   invokeCount: number;
   googleDriveFolderId?: string;
   vertexDataStoreId?: string;
+  vertexEngineId?: string;
+  aiAppType?: string;
+  dataSourceType?: string;
+  websiteUri?: string;
+  gcsUri?: string;
   secretManagerPath?: string;
   status?: 'CREATING' | 'INDEXING' | 'ACTIVE' | 'PAUSED' | 'ERROR' | string;
   fee?: number;
@@ -41,6 +46,11 @@ function toRecord(a: DbAgent): AgentRecord {
     invokeCount: a.invokeCount,
     googleDriveFolderId: a.googleDriveFolderId || undefined,
     vertexDataStoreId: a.vertexDataStoreId || undefined,
+    vertexEngineId: (a as any).vertexEngineId || undefined,
+    aiAppType: (a as any).aiAppType || undefined,
+    dataSourceType: (a as any).dataSourceType || undefined,
+    websiteUri: (a as any).websiteUri || undefined,
+    gcsUri: (a as any).gcsUri || undefined,
     secretManagerPath: a.secretManagerPath || undefined,
     status: a.status,
     fee: a.feeUsdc,
@@ -146,6 +156,11 @@ export async function putAgent(agent: AgentRecord): Promise<AgentRecord> {
       invokeCount: agent.invokeCount || 0,
       googleDriveFolderId: agent.googleDriveFolderId || null,
       vertexDataStoreId: agent.vertexDataStoreId || null,
+      vertexEngineId: agent.vertexEngineId || null,
+      aiAppType: agent.aiAppType || 'search_docs',
+      dataSourceType: agent.dataSourceType || 'none',
+      websiteUri: agent.websiteUri || null,
+      gcsUri: agent.gcsUri || null,
       secretManagerPath: agent.secretManagerPath || null,
       status: agent.status || 'ACTIVE',
       feeUsdc: fee,
@@ -162,6 +177,11 @@ export async function putAgent(agent: AgentRecord): Promise<AgentRecord> {
       invokeCount: agent.invokeCount || 0,
       googleDriveFolderId: agent.googleDriveFolderId || null,
       vertexDataStoreId: agent.vertexDataStoreId || null,
+      vertexEngineId: agent.vertexEngineId || null,
+      aiAppType: agent.aiAppType || 'search_docs',
+      dataSourceType: agent.dataSourceType || 'none',
+      websiteUri: agent.websiteUri || null,
+      gcsUri: agent.gcsUri || null,
       secretManagerPath: agent.secretManagerPath || null,
       status: agent.status || 'ACTIVE',
       feeUsdc: fee,

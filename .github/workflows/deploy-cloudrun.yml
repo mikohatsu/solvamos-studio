@@ -92,23 +92,55 @@ jobs:
         run: |
           set -euo pipefail
           test -f dist/server.cjs
+          test -d node_modules/.prisma/client
           test -d dist/client -o -d dist/assets -o -f dist/index.html \
             || ls -la dist
           echo "Artifacts OK:"
           ls -la dist | head -40
+          ls -la node_modules/.prisma/client | head -20
 
-      - name: Docker build (no push)
+      - name: Docker build + boot smoke (PORT probe)
         run: |
           set -euo pipefail
-          docker build -t solvamos-studio:ci-${{ github.sha }} .
-          echo "Docker image built locally (not pushed)."
+          IMAGE=solvamos-studio:ci-${{ github.sha }}
+          docker build -t "${IMAGE}" .
+          # Minimal prod env so assertProductionSafety + prisma engines load.
+          # DB URL is a dummy — listen happens before connect; connect will fail and exit 1
+          # after PORT is already bound. Probe only needs TCP accept within a few seconds.
+          CID=$(docker run -d \
+            -e PORT=8080 \
+            -e NODE_ENV=production \
+            -e JWT_SECRET='ci-smoke-jwt-secret-at-least-32-chars!!' \
+            -e DATABASE_URL='postgresql://ci:ci@127.0.0.1:1/ci?connect_timeout=1' \
+            -e GOOGLE_CLOUD_PROJECT='ci-project' \
+            -e ALLOW_LOCAL_VAULT_FALLBACK=false \
+            -e ALLOW_PAYMENT_BYPASS=false \
+            -e PAYMENT_NETWORK=devnet \
+            -e BOOT_ALLOW_DEGRADED=true \
+            -p 18080:8080 \
+            "${IMAGE}")
+          cleanup() { docker logs "${CID}" || true; docker rm -f "${CID}" >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          ok=0
+          for i in $(seq 1 30); do
+            if curl -fsS "http://127.0.0.1:18080/healthz" >/dev/null; then
+              ok=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "${ok}" != "1" ]; then
+            echo "::error::Container never answered /healthz on :8080 — see docker logs above"
+            exit 1
+          fi
+          echo "Docker boot smoke OK (/healthz)"
 
       - name: Build summary
         run: |
           {
             echo "### Build test"
-            echo "- \`npm run build\`: pass"
-            echo "- Docker build: pass"
+            echo "- \`npm run build\` + prisma generate: pass"
+            echo "- Docker build + /healthz smoke: pass"
           } >> "$GITHUB_STEP_SUMMARY"
 
   # ── 3) 배포 (main push / 수동만 · review+build 성공 필수) ───────
@@ -262,6 +294,7 @@ jobs:
             --cpu-boost \
             --min-instances="${{ steps.tier.outputs.min }}" \
             --max-instances=20 \
+            --add-cloudsql-instances="${PROJECT_ID}:${REGION}:solvamos-studio-pg" \
             --update-env-vars="NODE_ENV=production,CUSTOMER_TIER=${TIER},ALLOW_LOCAL_VAULT_FALLBACK=false,ALLOW_PAYMENT_BYPASS=false,ALLOW_ADC_DRIVE=false,GOOGLE_CLOUD_PROJECT=${PROJECT_ID},PAYMENT_NETWORK=devnet"
 
       - name: Bind runtime URL + OAuth secrets (preserve across deploys)
@@ -286,6 +319,23 @@ jobs:
           if gcloud secrets describe gemini-api-key --project="${PROJECT_ID}" >/dev/null 2>&1; then
             SECRET_FLAGS+=("GEMINI_API_KEY=gemini-api-key:latest")
           fi
+          # Required for production boot (assertProductionSafety + Prisma)
+          missing_required=0
+          if gcloud secrets describe jwt-secret --project="${PROJECT_ID}" >/dev/null 2>&1; then
+            SECRET_FLAGS+=("JWT_SECRET=jwt-secret:latest")
+          else
+            echo "::error::Secret Manager missing jwt-secret — create it (>=32 chars) or Cloud Run will crash on boot"
+            missing_required=1
+          fi
+          if gcloud secrets describe database-url --project="${PROJECT_ID}" >/dev/null 2>&1; then
+            SECRET_FLAGS+=("DATABASE_URL=database-url:latest")
+          else
+            echo "::error::Secret Manager missing database-url — create Cloud SQL URL secret or Cloud Run will crash on boot"
+            missing_required=1
+          fi
+          if [ "${missing_required}" = "1" ]; then
+            exit 1
+          fi
 
           ARGS=(
             run services update "${SERVICE}"
@@ -304,9 +354,9 @@ jobs:
           {
             echo "### Deployed"
             echo "- **URL:** ${URL}"
-            echo "- **Health:** ${URL}/api/status"
+            echo "- **Health:** ${URL}/healthz"
             echo "- **Image:** \`${IMAGE_URI}\`"
-            echo "- **OAuth env:** merged (APP_URL + Secret Manager re-bind if secrets exist)"
+            echo "- **Secrets:** JWT_SECRET + DATABASE_URL + OAuth/Gemini (if present)"
             if [ -z "${GOOGLE_CLIENT_ID_VAR}" ]; then
               echo "- **Note:** set repo Variable \`GOOGLE_CLIENT_ID\` so CI re-applies Client ID every deploy"
             fi

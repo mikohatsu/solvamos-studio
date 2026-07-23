@@ -1137,15 +1137,31 @@ app.post('/api/agents/:id/invoke', async (req, res) => {
 });
 
 async function startServer() {
+  // Bind PORT first — Cloud Run probes :8080 before DB warm completes.
+  await new Promise<void>((resolve, reject) => {
+    const server = app.listen(config.port, '0.0.0.0', () => {
+      console.log(`[${config.product}] v${config.version} http://0.0.0.0:${config.port}`);
+      resolve();
+    });
+    server.on('error', reject);
+  });
+
   if (process.env.DATABASE_URL) {
     try {
       await connectDb();
     } catch (err: any) {
-      console.error('[db] connect failed — sessions will use file cache only', err?.message || err);
-      if (config.isProd) throw err;
+      console.error('[db] connect failed', err?.message || err);
+      if (config.isProd && process.env.BOOT_ALLOW_DEGRADED !== 'true') {
+        console.error('[boot] DATABASE_URL unreachable in production — exiting');
+        process.exit(1);
+      }
     }
   } else {
     console.warn('[db] DATABASE_URL unset — JWT refresh works, but Google tokens won’t survive restarts');
+    if (config.isProd && process.env.BOOT_ALLOW_DEGRADED !== 'true') {
+      console.error('[boot] DATABASE_URL required in production — exiting');
+      process.exit(1);
+    }
   }
 
   await loadTenants();
@@ -1171,10 +1187,6 @@ async function startServer() {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
-
-  app.listen(config.port, '0.0.0.0', () => {
-    console.log(`[${config.product}] v${config.version} http://0.0.0.0:${config.port}`);
-  });
 }
 
 startServer().catch((err) => {

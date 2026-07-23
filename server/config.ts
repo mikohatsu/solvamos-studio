@@ -211,6 +211,9 @@ export function assertProductionSafety() {
   if (jwt.length < 32) {
     problems.push('JWT_SECRET (>=32 chars) is required in production');
   }
+  if (!process.env.DATABASE_URL) {
+    problems.push('DATABASE_URL is required in production');
+  }
   if (problems.length) {
     console.error('[SolVamos] Production safety check FAILED:\n - ' + problems.join('\n - '));
     throw new Error(`Production safety check failed: ${problems.join('; ')}`);
